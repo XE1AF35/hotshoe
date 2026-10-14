@@ -65,3 +65,21 @@ export function formatDay(day: DayKey): string {
     year: 'numeric',
   }).format(Date.parse(`${day}T00:00:00Z`));
 }
+
+/** A moment in this device's own time zone, such as when the last backup was made. */
+export function formatDeviceTime(epochMs: number): string {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return formatter(timeZone, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(epochMs);
+}
+
+/** `850 KB` or `12.4 MB`, in the decimal units the Files app uses. */
+export function formatBytes(bytes: number): string {
+  if (bytes < 1e6) return `${Math.max(1, Math.round(bytes / 1e3))} KB`;
+  return `${(bytes / 1e6).toFixed(1)} MB`;
+}

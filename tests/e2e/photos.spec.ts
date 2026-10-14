@@ -1,25 +1,9 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { cameraJpeg } from './helpers.ts';
 
 const wharf = { latitude: -36.840556, longitude: 174.766389, accuracy: 6 };
 
 test.use({ geolocation: wharf, permissions: ['geolocation'] });
-
-/** Draws a 3,000 by 2,000 JPEG in the page, larger than the stored size, and returns its bytes. */
-async function cameraJpeg(page: Page): Promise<Buffer> {
-  const dataUrl = await page.evaluate(() => {
-    const canvas = document.createElement('canvas');
-    canvas.width = 3000;
-    canvas.height = 2000;
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('no 2D context');
-    context.fillStyle = '#0369a1';
-    context.fillRect(0, 0, 3000, 2000);
-    context.fillStyle = '#f59e0b';
-    context.fillRect(1000, 600, 1000, 800);
-    return canvas.toDataURL('image/jpeg', 0.8);
-  });
-  return Buffer.from(dataUrl.split(',')[1] ?? '', 'base64');
-}
 
 test('logs with a photo, keeps it after a reload, and removes it', async ({ page }) => {
   await page.goto('./');
