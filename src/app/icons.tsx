@@ -101,3 +101,12 @@ export function CloseIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/** A link that leaves Hotshoe, such as the source code on GitHub. */
+export function ExternalLinkIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+    </Svg>
+  );
+}

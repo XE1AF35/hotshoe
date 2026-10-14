@@ -1,3 +1,4 @@
+import { ExternalLinkIcon } from '../../app/icons.tsx';
 import { ScreenHeader } from '../../app/ScreenHeader.tsx';
 import { BackupSection } from '../transfer/BackupSection.tsx';
 import { ExportSection } from '../transfer/ExportSection.tsx';
@@ -27,6 +28,17 @@ export function MoreScreen() {
           Map data © OpenStreetMap contributors, served by OpenFreeMap. Hotshoe is open source under
           the MIT licence.
         </p>
+        {/* Opens in Safari, since it leaves the app. */}
+        <a
+          href="https://github.com/XE1AF35/hotshoe"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex min-h-11 items-center gap-2 font-medium text-accent-ink underline underline-offset-4"
+        >
+          Hotshoe on GitHub
+          <ExternalLinkIcon className="size-4" />
+          <span className="sr-only">(opens in Safari)</span>
+        </a>
       </section>
     </section>
   );

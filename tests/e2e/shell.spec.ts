@@ -85,3 +85,10 @@ for (const colorScheme of ['light', 'dark'] as const) {
     }
   });
 }
+
+test('links to the source code on GitHub from the More tab', async ({ page }) => {
+  await page.goto('./#/more');
+  const link = page.getByRole('link', { name: /Hotshoe on GitHub/ });
+  await expect(link).toHaveAttribute('href', 'https://github.com/XE1AF35/hotshoe');
+  await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+});
