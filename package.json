@@ -25,9 +25,11 @@
   "dependencies": {
     "dexie": "4.4.6",
     "dexie-react-hooks": "4.4.0",
+    "fflate": "0.8.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "workbox-window": "7.4.1"
+    "workbox-window": "7.4.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.13.0",
