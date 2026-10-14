@@ -1,18 +1,21 @@
-import type { JSX } from 'react';
+import { type ComponentType, lazy, Suspense } from 'react';
 import { LogScreen } from '../features/capture/LogScreen.tsx';
-import { EntriesScreen } from '../features/entries/EntriesScreen.tsx';
-import { MapScreen } from '../features/map/MapScreen.tsx';
-import { MoreScreen } from '../features/settings/MoreScreen.tsx';
 import { InstallBanner } from './InstallBanner.tsx';
 import { type Tab, useTab } from './router.ts';
 import { TabBar } from './TabBar.tsx';
 import { Updater } from './Updater.tsx';
 
-const screens: Record<Tab, () => JSX.Element> = {
+// Log opens first and must be instant, so it is in the main bundle. The other tabs load the first
+// time they open; the service worker has already stored them, so that works offline too.
+const screens: Record<Tab, ComponentType> = {
   log: LogScreen,
-  entries: EntriesScreen,
-  map: MapScreen,
-  more: MoreScreen,
+  entries: lazy(() =>
+    import('../features/entries/EntriesScreen.tsx').then((m) => ({ default: m.EntriesScreen })),
+  ),
+  map: lazy(() => import('../features/map/MapScreen.tsx').then((m) => ({ default: m.MapScreen }))),
+  more: lazy(() =>
+    import('../features/settings/MoreScreen.tsx').then((m) => ({ default: m.MoreScreen })),
+  ),
 };
 
 export function App() {
@@ -27,7 +30,9 @@ export function App() {
       <InstallBanner />
       <div className="flex flex-1 scroll-pb-36 flex-col overflow-y-auto overscroll-contain">
         <main className="mx-auto flex w-full max-w-xl flex-1 flex-col px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-6">
-          <Screen />
+          <Suspense fallback={null}>
+            <Screen />
+          </Suspense>
         </main>
       </div>
       <TabBar current={tab} />

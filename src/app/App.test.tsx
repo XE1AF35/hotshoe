@@ -31,13 +31,13 @@ describe('App', () => {
     expect(screen.getByRole('link', { name: 'Log' }).getAttribute('aria-current')).toBe('page');
   });
 
-  it('follows the hash to another tab', () => {
+  it('follows the hash to another tab', async () => {
     renderApp();
     act(() => {
       window.location.hash = '#/map';
       window.dispatchEvent(new HashChangeEvent('hashchange'));
     });
-    expect(screen.getByRole('heading', { level: 1, name: 'Map' })).toBeDefined();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Map' })).toBeDefined();
     expect(screen.getByRole('link', { name: 'Map' }).getAttribute('aria-current')).toBe('page');
     expect(screen.getByRole('link', { name: 'Log' }).getAttribute('aria-current')).toBeNull();
   });
