@@ -27,11 +27,18 @@ export function TabBar({ current }: { readonly current: Tab }) {
               <a
                 href={tabHref(tab)}
                 aria-current={isCurrent ? 'page' : undefined}
-                className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs ${
-                  isCurrent ? 'font-semibold text-accent-ink' : 'text-muted'
+                className={`flex min-h-14 flex-col items-center justify-center gap-1 pt-1.5 text-xs ${
+                  isCurrent ? 'font-semibold text-ink' : 'text-muted'
                 }`}
               >
-                <Icon className="size-6" />
+                {/* The current tab's icon sits in a pill, as in iOS and Android tab bars. */}
+                <span
+                  className={`flex h-8 w-14 items-center justify-center rounded-full motion-safe:transition-colors ${
+                    isCurrent ? 'bg-accent text-on-accent' : ''
+                  }`}
+                >
+                  <Icon className="size-5" />
+                </span>
                 {label}
               </a>
             </li>

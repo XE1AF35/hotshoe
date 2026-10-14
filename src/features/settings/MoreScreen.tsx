@@ -1,3 +1,4 @@
+import { ScreenHeader } from '../../app/ScreenHeader.tsx';
 import { BackupSection } from '../transfer/BackupSection.tsx';
 import { TripsSection } from '../trips/TripsSection.tsx';
 import { SettingsSection } from './SettingsSection.tsx';
@@ -5,9 +6,7 @@ import { SettingsSection } from './SettingsSection.tsx';
 export function MoreScreen() {
   return (
     <section aria-labelledby="screen-title" className="space-y-8">
-      <h1 id="screen-title" className="font-semibold text-2xl">
-        More
-      </h1>
+      <ScreenHeader title="More" />
       <BackupSection />
       <TripsSection />
       <SettingsSection />
