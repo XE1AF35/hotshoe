@@ -92,3 +92,25 @@ test('links to the source code on GitHub from the More tab', async ({ page }) =>
   await expect(link).toHaveAttribute('href', 'https://github.com/XE1AF35/hotshoe');
   await expect(link).toHaveAttribute('rel', 'noopener noreferrer');
 });
+
+test('loads the Entries, Map, and More tabs only when they open', async ({ page }) => {
+  const tabChunks: string[] = [];
+  page.on('request', (request) => {
+    const match = /\/(EntriesScreen|MapScreen|MoreScreen)-[^/]+\.js$/.exec(request.url());
+    if (match?.[1]) tabChunks.push(match[1]);
+  });
+  await page.goto('./');
+  await expect(page.getByRole('heading', { level: 1, name: 'Log' })).toBeVisible();
+  expect(tabChunks).toEqual([]);
+
+  const nav = page.getByRole('navigation', { name: 'Main' });
+  for (const [tab, chunk] of [
+    ['Entries', 'EntriesScreen'],
+    ['Map', 'MapScreen'],
+    ['More', 'MoreScreen'],
+  ] as const) {
+    await nav.getByRole('link', { name: tab }).click();
+    await expect(page.getByRole('heading', { level: 1, name: tab })).toBeVisible();
+    expect(tabChunks).toContain(chunk);
+  }
+});
