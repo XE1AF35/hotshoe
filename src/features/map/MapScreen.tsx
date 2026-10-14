@@ -15,7 +15,8 @@ import { ScreenHeader } from '../../app/ScreenHeader.tsx';
 import { useDb } from '../../db/DbProvider.tsx';
 import { useEntries, useSettings, useTrips } from '../../db/hooks.ts';
 import type { EntryId } from '../../db/schema.ts';
-import { defaultSettings, setSetting } from '../../db/settings.ts';
+import { coordStyleOf, defaultSettings, setSetting } from '../../db/settings.ts';
+import { defaultCoordStyle } from '../../lib/coords.ts';
 import { MapEntryCard } from './MapEntryCard.tsx';
 import type { MapFocus } from './MapView.tsx';
 import { entryPoints, type TripFilter } from './points.ts';
@@ -137,7 +138,7 @@ export function MapScreen() {
           {selected && (
             <MapEntryCard
               entry={selected}
-              coordFormat={settings?.coordFormat ?? defaultSettings.coordFormat}
+              coordStyle={settings ? coordStyleOf(settings) : defaultCoordStyle}
               accuracyTargetM={settings?.accuracyTargetM ?? defaultSettings.accuracyTargetM}
               onClose={() => setSelectedId(null)}
             />

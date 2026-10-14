@@ -5,7 +5,7 @@ import { useHoldUpdates } from '../../app/updates.ts';
 import { useDb } from '../../db/DbProvider.tsx';
 import { useLatestEntry, useSettings } from '../../db/hooks.ts';
 import type { Entry } from '../../db/schema.ts';
-import type { Settings } from '../../db/settings.ts';
+import { coordStyleOf, type Settings } from '../../db/settings.ts';
 import { formatAccuracy } from '../../lib/format.ts';
 import { attachPhotos, attachProblemMessage } from '../photos/attach.ts';
 import { usePhotoInputs } from '../photos/usePhotoInputs.tsx';
@@ -86,7 +86,7 @@ function LogScreenBody({
       {latest ? (
         <EntryCard
           entry={latest}
-          coordFormat={settings.coordFormat}
+          coordStyle={coordStyleOf(settings)}
           accuracyTargetM={settings.accuracyTargetM}
           heading={justSaved ? 'Logged' : 'Last logged'}
         />

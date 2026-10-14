@@ -8,7 +8,8 @@ import { type DeletedEntry, restoreEntry } from '../../db/entries.ts';
 import { useEntries, usePhotoCounts, useSettings, useTrips } from '../../db/hooks.ts';
 import { firstThumb } from '../../db/photos.ts';
 import type { Entry, EntryId, Trip, TripId } from '../../db/schema.ts';
-import { defaultSettings } from '../../db/settings.ts';
+import { coordStyleOf, defaultSettings } from '../../db/settings.ts';
+import { defaultCoordStyle } from '../../lib/coords.ts';
 import { formatDay, formatLoggedClock } from '../../lib/format.ts';
 import { useObjectUrl } from '../../lib/useObjectUrl.ts';
 import { AccuracyPill } from '../capture/AccuracyPill.tsx';
@@ -112,7 +113,7 @@ export function EntriesScreen() {
       <EntrySheet
         entry={openEntry}
         trips={trips ?? []}
-        coordFormat={settings?.coordFormat ?? 'decimal'}
+        coordStyle={settings ? coordStyleOf(settings) : defaultCoordStyle}
         onClose={() => setOpenId(null)}
         onDeleted={setDeleted}
       />

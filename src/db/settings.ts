@@ -1,4 +1,4 @@
-import type { CoordFormat } from '../lib/coords.ts';
+import type { CoordFormat, CoordStyle, DecimalMark } from '../lib/coords.ts';
 import type { HotshoeDb } from './database.ts';
 import { withStorageErrors } from './errors.ts';
 import type { TripId } from './schema.ts';
@@ -10,6 +10,7 @@ export interface Settings {
   activeTripId: TripId | null;
   lastBackupAt: number | null;
   coordFormat: CoordFormat;
+  decimalMark: DecimalMark;
   accuracyTargetM: number;
   fixTimeoutS: number;
   photoQuality: PhotoQuality;
@@ -29,6 +30,7 @@ export const defaultSettings: Readonly<Settings> = {
   activeTripId: null,
   lastBackupAt: null,
   coordFormat: 'decimal',
+  decimalMark: 'point',
   accuracyTargetM: 20,
   fixTimeoutS: 45,
   photoQuality: 'standard',
@@ -47,6 +49,7 @@ const guards: { [K in SettingKey]: (value: unknown) => value is Settings[K] } = 
   activeTripId: (value): value is TripId | null => value === null || typeof value === 'string',
   lastBackupAt: isTimestampOrNull,
   coordFormat: (value): value is CoordFormat => value === 'decimal' || value === 'dms',
+  decimalMark: (value): value is DecimalMark => value === 'point' || value === 'comma',
   accuracyTargetM: isPositiveNumber,
   fixTimeoutS: isPositiveNumber,
   photoQuality: (value): value is PhotoQuality => value === 'standard' || value === 'high',
@@ -56,6 +59,11 @@ const guards: { [K in SettingKey]: (value: unknown) => value is Settings[K] } = 
     value === null || value === 'granted' || value === 'denied' || value === 'unsupported',
   mapLoadsAutomatically: (value): value is boolean => typeof value === 'boolean',
 };
+
+/** How coordinates are shown and copied. */
+export function coordStyleOf(settings: Pick<Settings, 'coordFormat' | 'decimalMark'>): CoordStyle {
+  return { format: settings.coordFormat, decimalMark: settings.decimalMark };
+}
 
 /** Reads a setting, falling back to the default when it is missing or not a valid value. */
 export async function getSetting<K extends SettingKey>(

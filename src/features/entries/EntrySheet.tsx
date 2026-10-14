@@ -5,8 +5,9 @@ import { Sheet } from '../../app/Sheet.tsx';
 import { useDb } from '../../db/DbProvider.tsx';
 import { type DeletedEntry, deleteEntry, updateEntry } from '../../db/entries.ts';
 import { type Entry, limits, type Trip } from '../../db/schema.ts';
-import { type CoordFormat, formatCoords } from '../../lib/coords.ts';
+import type { CoordStyle } from '../../lib/coords.ts';
 import { formatAccuracy, formatLoggedTime } from '../../lib/format.ts';
+import { CoordLines } from '../capture/CoordLines.tsx';
 import { CopyCoordsButton } from '../capture/CopyCoordsButton.tsx';
 import { PhotoStrip } from '../photos/PhotoStrip.tsx';
 import { TripSelect } from '../trips/TripSelect.tsx';
@@ -14,13 +15,13 @@ import { TripSelect } from '../trips/TripSelect.tsx';
 export function EntrySheet({
   entry,
   trips,
-  coordFormat,
+  coordStyle,
   onClose,
   onDeleted,
 }: {
   readonly entry: Entry | null;
   readonly trips: readonly Trip[];
-  readonly coordFormat: CoordFormat;
+  readonly coordStyle: CoordStyle;
   readonly onClose: () => void;
   readonly onDeleted: (deleted: DeletedEntry) => void;
 }) {
@@ -31,7 +32,7 @@ export function EntrySheet({
           key={entry.id}
           entry={entry}
           trips={trips}
-          coordFormat={coordFormat}
+          coordStyle={coordStyle}
           onClose={onClose}
           onDeleted={onDeleted}
         />
@@ -43,13 +44,13 @@ export function EntrySheet({
 function EntryForm({
   entry,
   trips,
-  coordFormat,
+  coordStyle,
   onClose,
   onDeleted,
 }: {
   readonly entry: Entry;
   readonly trips: readonly Trip[];
-  readonly coordFormat: CoordFormat;
+  readonly coordStyle: CoordStyle;
   readonly onClose: () => void;
   readonly onDeleted: (deleted: DeletedEntry) => void;
 }) {
@@ -84,7 +85,7 @@ function EntryForm({
   return (
     <form onSubmit={save} className="space-y-4">
       <div className="space-y-1">
-        <p className="font-mono text-lg tabular-nums">{formatCoords(entry, coordFormat)}</p>
+        <CoordLines coords={entry} style={coordStyle} className="text-lg" />
         <p className="text-muted text-sm">
           {formatLoggedTime(entry.loggedAt, entry)} · {formatAccuracy(entry.accuracyM)}
           {entry.altitudeM !== null && ` · ${Math.round(entry.altitudeM)} m altitude`}
@@ -93,7 +94,7 @@ function EntryForm({
       <div className="flex flex-wrap items-start gap-2">
         {/* Side by side when both labels fit on one line, otherwise stacked full width. */}
         <div className="min-w-0 grow basis-52">
-          <CopyCoordsButton coords={entry} format={coordFormat} />
+          <CopyCoordsButton coords={entry} style={coordStyle} />
         </div>
         <a
           href={detailHref('map', entry.id)}

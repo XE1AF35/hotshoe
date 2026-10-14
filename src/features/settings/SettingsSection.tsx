@@ -7,7 +7,7 @@ import {
   type Settings,
   setSetting,
 } from '../../db/settings.ts';
-import { type CoordFormat, formatCoords } from '../../lib/coords.ts';
+import { type CoordFormat, type DecimalMark, formatCoords } from '../../lib/coords.ts';
 
 const example = { lat: -36.848461, lon: 174.763336 };
 const accuracyChoices = [10, 20, 30, 50, 100] as const;
@@ -54,7 +54,35 @@ export function SettingsSection() {
             <span>
               {format === 'decimal' ? 'Decimal degrees' : 'Degrees, minutes, seconds'}
               <span className="block font-mono text-muted text-sm">
-                {formatCoords(example, format)}
+                {formatCoords(example, { format, decimalMark: settings.decimalMark })}
+              </span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+
+      <fieldset className="space-y-1">
+        <legend className="mb-1 font-medium text-sm">Decimal mark</legend>
+        <p className="px-3 text-muted text-sm">
+          For apps that follow a region setting with a decimal comma. Exported files always use a
+          point.
+        </p>
+        {(['point', 'comma'] as const satisfies readonly DecimalMark[]).map((mark) => (
+          <label
+            key={mark}
+            className="flex min-h-12 items-center gap-3 rounded-xl px-3 has-checked:bg-raised"
+          >
+            <input
+              type="radio"
+              name="decimal-mark"
+              checked={settings.decimalMark === mark}
+              onChange={() => save('decimalMark', mark)}
+              className="size-5 accent-accent-ink"
+            />
+            <span>
+              {mark === 'point' ? 'Point' : 'Comma'}
+              <span className="block font-mono text-muted text-sm">
+                {formatCoords(example, { format: settings.coordFormat, decimalMark: mark })}
               </span>
             </span>
           </label>

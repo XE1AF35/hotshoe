@@ -149,6 +149,30 @@ describe('LogScreen', () => {
     await waitFor(async () => expect((await listEntries(db))[0]?.frame).toBe('12A'));
   });
 
+  it('copies with a decimal comma, and copies latitude or longitude alone', async () => {
+    const db = createTestDb();
+    await setSetting(db, 'decimalMark', 'comma');
+    const gps = installFakeGeolocation();
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(window.navigator, 'clipboard', {
+      value: { writeText },
+      configurable: true,
+    });
+    renderLogScreen(db);
+
+    await tapLog();
+    await waitFor(() => expect(gps.watchers.size).toBe(1));
+    act(() => gps.emit(5));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy coordinates' }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith('-36,848461; 174,763336'));
+
+    fireEvent.click(screen.getByRole('button', { name: /^Copy latitude/ }));
+    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith('-36,848461'));
+    fireEvent.click(screen.getByRole('button', { name: /^Copy longitude/ }));
+    await waitFor(() => expect(writeText).toHaveBeenLastCalledWith('174,763336'));
+  });
+
   it('flags a fix too coarse to be useful', async () => {
     const db = createTestDb();
     const gps = installFakeGeolocation();

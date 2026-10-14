@@ -5,6 +5,21 @@ export interface LatLon {
 
 export type CoordFormat = 'decimal' | 'dms';
 
+/**
+ * The decimal mark for coordinates shown and copied. Apps that follow a comma-decimal region
+ * setting, such as digiKam's coordinate fields in much of Europe, want `-36,848461`. Exported
+ * files always use a point, as their formats require.
+ */
+export type DecimalMark = 'point' | 'comma';
+
+/** How coordinates are shown and copied, from the person's settings. */
+export interface CoordStyle {
+  readonly format: CoordFormat;
+  readonly decimalMark: DecimalMark;
+}
+
+export const defaultCoordStyle: CoordStyle = { format: 'decimal', decimalMark: 'point' };
+
 /** Six decimal places is about 0.1 m, finer than any phone GPS fix. */
 const decimalPlaces = 6;
 
@@ -32,18 +47,29 @@ export function formatDegrees(value: number): string {
   return fixedWithoutNegativeZero(value, decimalPlaces);
 }
 
-export function formatCoords(coords: LatLon, format: CoordFormat): string {
-  return format === 'dms' ? formatDms(coords) : formatDecimal(coords);
+/**
+ * Latitude then longitude as one line, ready to paste. With a decimal comma the two are split by
+ * a semicolon, so the commas inside each number can't be misread: `-36,848461; 174,763336`.
+ */
+export function formatCoords(coords: LatLon, style: CoordStyle): string {
+  return formatCoordParts(coords, style).join(style.decimalMark === 'comma' ? '; ' : ', ');
 }
 
 /** Latitude and longitude apart, in the same form as formatCoords, for showing on two lines. */
 export function formatCoordParts(
   { lat, lon }: LatLon,
-  format: CoordFormat,
+  style: CoordStyle,
 ): readonly [lat: string, lon: string] {
-  return format === 'dms'
-    ? [dmsPart(lat, 'N', 'S'), dmsPart(lon, 'E', 'W')]
-    : [fixedWithoutNegativeZero(lat, decimalPlaces), fixedWithoutNegativeZero(lon, decimalPlaces)];
+  const parts: [string, string] =
+    style.format === 'dms'
+      ? [dmsPart(lat, 'N', 'S'), dmsPart(lon, 'E', 'W')]
+      : [
+          fixedWithoutNegativeZero(lat, decimalPlaces),
+          fixedWithoutNegativeZero(lon, decimalPlaces),
+        ];
+  return style.decimalMark === 'comma'
+    ? [parts[0].replace('.', ','), parts[1].replace('.', ',')]
+    : parts;
 }
 
 function fixedWithoutNegativeZero(value: number, digits: number): string {

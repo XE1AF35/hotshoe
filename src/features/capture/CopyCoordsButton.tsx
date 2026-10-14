@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react';
 import { CheckIcon, CopyIcon } from '../../app/icons.tsx';
 import { copyText } from '../../lib/clipboard.ts';
-import { type CoordFormat, formatCoords, type LatLon } from '../../lib/coords.ts';
+import { type CoordStyle, formatCoords, type LatLon } from '../../lib/coords.ts';
 
 /** One tap copies the coordinates, ready to paste into a photo site, map app, or editor. */
 export function CopyCoordsButton({
   coords,
-  format,
+  style,
 }: {
   readonly coords: LatLon;
-  readonly format: CoordFormat;
+  readonly style: CoordStyle;
 }) {
-  const text = formatCoords(coords, format);
+  const text = formatCoords(coords, style);
   const [result, setResult] = useState<'copied' | 'failed' | null>(null);
 
   useEffect(() => {

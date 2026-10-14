@@ -11,7 +11,8 @@ test.describe('with location allowed', () => {
     await page.getByRole('button', { name: 'Log location' }).click();
 
     await expect(page.getByRole('heading', { name: 'Logged' })).toBeVisible();
-    await expect(page.getByText('-36.840556, 174.766389')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Copy latitude -36.840556' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Copy longitude 174.766389' })).toBeVisible();
     await expect(page.getByText('±6 m')).toBeVisible();
 
     await page.getByLabel('Label').fill('Ferry terminal');

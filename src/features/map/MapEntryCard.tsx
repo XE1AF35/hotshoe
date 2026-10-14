@@ -1,7 +1,7 @@
 import { CloseIcon } from '../../app/icons.tsx';
 import { usePhotos } from '../../db/hooks.ts';
 import type { Entry } from '../../db/schema.ts';
-import type { CoordFormat } from '../../lib/coords.ts';
+import type { CoordStyle } from '../../lib/coords.ts';
 import { formatLoggedTime } from '../../lib/format.ts';
 import { useObjectUrl } from '../../lib/useObjectUrl.ts';
 import { AccuracyPill } from '../capture/AccuracyPill.tsx';
@@ -10,12 +10,12 @@ import { CopyCoordsButton } from '../capture/CopyCoordsButton.tsx';
 /** The entry tapped on the map, over the bottom of the map so the point stays in view. */
 export function MapEntryCard({
   entry,
-  coordFormat,
+  coordStyle,
   accuracyTargetM,
   onClose,
 }: {
   readonly entry: Entry;
-  readonly coordFormat: CoordFormat;
+  readonly coordStyle: CoordStyle;
   readonly accuracyTargetM: number;
   readonly onClose: () => void;
 }) {
@@ -54,7 +54,7 @@ export function MapEntryCard({
           <CloseIcon className="size-5" />
         </button>
       </div>
-      <CopyCoordsButton coords={entry} format={coordFormat} />
+      <CopyCoordsButton coords={entry} style={coordStyle} />
     </section>
   );
 }

@@ -43,8 +43,21 @@ describe('formatDms', () => {
 
 describe('formatCoords', () => {
   it('chooses the format', () => {
-    expect(formatCoords(auckland, 'decimal')).toBe(formatDecimal(auckland));
-    expect(formatCoords(auckland, 'dms')).toBe(formatDms(auckland));
+    expect(formatCoords(auckland, { format: 'decimal', decimalMark: 'point' })).toBe(
+      formatDecimal(auckland),
+    );
+    expect(formatCoords(auckland, { format: 'dms', decimalMark: 'point' })).toBe(
+      formatDms(auckland),
+    );
+  });
+
+  it('uses a decimal comma, with a semicolon between the two numbers', () => {
+    expect(formatCoords(auckland, { format: 'decimal', decimalMark: 'comma' })).toBe(
+      '-36,848461; 174,763336',
+    );
+    expect(formatCoords(auckland, { format: 'dms', decimalMark: 'comma' })).toBe(
+      `36°50'54,5"S; 174°45'48,0"E`,
+    );
   });
 });
 
@@ -64,7 +77,13 @@ describe('isValidLatLon', () => {
 describe('formatCoordParts', () => {
   it('splits the same text formatCoords joins', () => {
     for (const format of ['decimal', 'dms'] as const) {
-      expect(formatCoordParts(auckland, format).join(', ')).toBe(formatCoords(auckland, format));
+      for (const decimalMark of ['point', 'comma'] as const) {
+        const style = { format, decimalMark };
+        const separator = decimalMark === 'comma' ? '; ' : ', ';
+        expect(formatCoordParts(auckland, style).join(separator)).toBe(
+          formatCoords(auckland, style),
+        );
+      }
     }
   });
 });
