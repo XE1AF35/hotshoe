@@ -27,6 +27,8 @@ Automated tests run in WebKit, which is close to iOS Safari but not the same. Ru
 - [ ] Copy coordinates and paste into a photo site or map app.
 - [ ] Export GPX through the share sheet to Files, then check it in digiKam, Lightroom, and darktable.
 - [ ] Export CSV and open it in Numbers or Excel: names with macrons come through.
+- [ ] Photograph Hotshoe's camera clock with your camera, enter both times, and export the trip's GPX matched to the camera clock: in digiKam, with the same time zone set, photos land where they were taken.
+- [ ] With Decimal mark set to Comma, copy a latitude on its own and paste it into digiKam's coordinate field.
 - [ ] In Entries, **Select** two entries and export them: only those two are in the file.
 - [ ] Make a backup with photos and save it to iCloud Drive.
 - [ ] Restore that backup into a fresh install (delete and re-add the app): entries, trips, and photos all return.

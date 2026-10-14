@@ -21,7 +21,7 @@ Hotshoe works offline after the first visit, and updates itself the next time yo
 
 - **Log:** tap **Log location** as you take a photo. Hotshoe waits until the fix is within your accuracy target (20 m unless you change it), then saves. **Use this fix** saves the best fix so far, marked as a weak fix if it missed the target. **Log with photo** also opens the camera for a reference shot.
 - **Label and frame:** type them on the card after logging. Nothing blocks the next log.
-- **Copy coordinates:** pastes as `-36.848461, 174.763336`, or as degrees, minutes, and seconds if you choose that in Settings.
+- **Copy coordinates:** pastes as `-36.848461, 174.763336`, or as degrees, minutes, and seconds if you choose that in Settings. Choose a decimal comma in Settings for apps that want `-36,848461`, and tap either line of an entry's coordinates to copy just that number.
 - **Trips:** pick an active trip on the Log screen and new entries join it.
 - **Entries:** grouped by day and trip. Tap one to edit it, add photos, or show it on the map. **Select** lets you tick entries and export just those.
 - **Map:** asks before loading, because the map comes from an online service (see Privacy).
@@ -33,6 +33,15 @@ Hotshoe works offline after the first visit, and updates itself the next time yo
 3. GPX times are in UTC. If your camera clock is set to local time, tell the software your camera's time zone or offset.
 
 Each trip is its own track and each day its own segment, so the software doesn't guess positions between days. CSV (for spreadsheets) and GeoJSON (for maps and GIS apps) exports are there too.
+
+### When the camera's clock is off
+
+Camera clocks drift, and are easy to leave on the wrong time zone. To correct for both:
+
+1. On the More tab, open a trip and tap **Show clock to photograph**, then take a photo of that clock with your camera.
+2. When you have the photo to hand, tap **Enter times from the photo** and type the time on Hotshoe's clock in the photo and the camera's own time for it, both with seconds.
+3. Export that trip as GPX with **Match this trip's camera clock** ticked, and choose the time zone you set in your photo software. It starts on your iPhone's time zone from when you measured the clock, which is what most people enter anyway.
+4. Set the same time zone in your photo software when geotagging. The file also notes it, in its description.
 
 ## Back up
 
