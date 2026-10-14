@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { formatAccuracy, formatLoggedTime } from './format.ts';
+import { formatAccuracy, formatDay, formatLoggedClock, formatLoggedTime } from './format.ts';
+import type { DayKey } from './time.ts';
 
 describe('formatAccuracy', () => {
   it.each([
@@ -26,5 +27,21 @@ describe('formatLoggedTime', () => {
     const text = formatLoggedTime(instant, { timeZone: 'Mars/Base', utcOffsetMin: 345 });
     expect(text).toContain('6:50:09');
     expect(text).toContain('(UTC+5:45)');
+  });
+});
+
+describe('formatLoggedClock', () => {
+  it('shows only the local clock time', () => {
+    const text = formatLoggedClock(Date.parse('2026-10-14T01:05:09Z'), {
+      timeZone: 'Pacific/Auckland',
+      utcOffsetMin: 780,
+    });
+    expect(text).toBe('2:05 pm');
+  });
+});
+
+describe('formatDay', () => {
+  it('spells out the day without shifting it', () => {
+    expect(formatDay('2026-10-14' as DayKey)).toBe('Wednesday, 14 October 2026');
   });
 });

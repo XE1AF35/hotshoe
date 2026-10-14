@@ -1,4 +1,4 @@
-import type { TimeContext } from './time.ts';
+import type { DayKey, TimeContext } from './time.ts';
 
 /** `±8 m`, `±120 m`, or `±1.4 km`. */
 export function formatAccuracy(metres: number): string {
@@ -6,29 +6,35 @@ export function formatAccuracy(metres: number): string {
   return `±${Math.round(metres)} m`;
 }
 
-const timeFormatters = new Map<string, Intl.DateTimeFormat>();
+const fullTime: Intl.DateTimeFormatOptions = {
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  hour: 'numeric',
+  minute: '2-digit',
+  second: '2-digit',
+};
+const clockTime: Intl.DateTimeFormatOptions = { hour: 'numeric', minute: '2-digit' };
 
-function formatter(timeZone: string): Intl.DateTimeFormat {
-  let cached = timeFormatters.get(timeZone);
+const formatters = new Map<string, Intl.DateTimeFormat>();
+
+function formatter(timeZone: string, options: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
+  const key = `${timeZone}|${JSON.stringify(options)}`;
+  let cached = formatters.get(key);
   if (!cached) {
-    cached = new Intl.DateTimeFormat('en-NZ', {
-      timeZone,
-      weekday: 'short',
-      day: 'numeric',
-      month: 'short',
-      hour: 'numeric',
-      minute: '2-digit',
-      second: '2-digit',
-    });
-    timeFormatters.set(timeZone, cached);
+    cached = new Intl.DateTimeFormat('en-NZ', { ...options, timeZone });
+    formatters.set(key, cached);
   }
   return cached;
 }
 
-/** The local time an entry was logged, in the zone where it was logged. */
-export function formatLoggedTime(epochMs: number, context: TimeContext): string {
+function formatInZone(
+  epochMs: number,
+  context: TimeContext,
+  options: Intl.DateTimeFormatOptions,
+): string {
   try {
-    return formatter(context.timeZone).format(epochMs);
+    return formatter(context.timeZone, options).format(epochMs);
   } catch {
     // Unknown zone: show the recorded offset's local time, marked with that offset.
     const shifted = epochMs + context.utcOffsetMin * 60_000;
@@ -36,6 +42,26 @@ export function formatLoggedTime(epochMs: number, context: TimeContext): string 
     const hours = Math.floor(Math.abs(context.utcOffsetMin) / 60);
     const minutes = Math.abs(context.utcOffsetMin) % 60;
     const offset = `UTC${sign}${hours}${minutes ? `:${String(minutes).padStart(2, '0')}` : ''}`;
-    return `${formatter('UTC').format(shifted)} (${offset})`;
+    return `${formatter('UTC', options).format(shifted)} (${offset})`;
   }
+}
+
+/** The local date and time an entry was logged, in the zone where it was logged. */
+export function formatLoggedTime(epochMs: number, context: TimeContext): string {
+  return formatInZone(epochMs, context, fullTime);
+}
+
+/** Just the local clock time an entry was logged, for lists already grouped by day. */
+export function formatLoggedClock(epochMs: number, context: TimeContext): string {
+  return formatInZone(epochMs, context, clockTime);
+}
+
+/** `Wednesday, 14 October 2026` */
+export function formatDay(day: DayKey): string {
+  return formatter('UTC', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  }).format(Date.parse(`${day}T00:00:00Z`));
 }
