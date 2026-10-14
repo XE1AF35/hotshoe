@@ -17,6 +17,10 @@ const contentSecurityPolicy = [
   "default-src 'self'",
   "script-src 'self'",
   "style-src 'self'",
+  // WebKit sets an inline style attribute on <select> when its value changes, and reports a
+  // violation without this. Style attributes cannot run script or select elements, and any url()
+  // in one is still limited by img-src; <style> elements stay blocked by style-src above.
+  "style-src-attr 'unsafe-inline'",
   "img-src 'self' data: blob:",
   "connect-src 'self'",
   "object-src 'none'",
