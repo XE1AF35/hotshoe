@@ -1,11 +1,14 @@
 import { useCallback, useMemo, useState } from 'react';
 import { CameraIcon } from '../../app/icons.tsx';
+import { ScreenHeader } from '../../app/ScreenHeader.tsx';
 import { Toast } from '../../app/Toast.tsx';
 import { useDb } from '../../db/DbProvider.tsx';
 import { type DeletedEntry, restoreEntry } from '../../db/entries.ts';
 import { useEntries, usePhotoCounts, useSettings, useTrips } from '../../db/hooks.ts';
 import type { Entry, EntryId, Trip, TripId } from '../../db/schema.ts';
-import { formatAccuracy, formatDay, formatLoggedClock } from '../../lib/format.ts';
+import { defaultSettings } from '../../db/settings.ts';
+import { formatDay, formatLoggedClock } from '../../lib/format.ts';
+import { AccuracyPill } from '../capture/AccuracyPill.tsx';
 import { EntrySheet } from './EntrySheet.tsx';
 import { groupByDayAndTrip } from './grouping.ts';
 
@@ -28,9 +31,7 @@ export function EntriesScreen() {
 
   return (
     <section aria-labelledby="screen-title" className="space-y-6">
-      <h1 id="screen-title" className="font-semibold text-2xl">
-        Entries
-      </h1>
+      <ScreenHeader title="Entries" />
 
       {entries !== undefined && entries.length === 0 && (
         <p className="text-muted">
@@ -44,13 +45,16 @@ export function EntriesScreen() {
             {formatDay(day.day)}
           </h2>
           {day.trips.map((group) => (
-            <div key={group.trip?.id ?? 'none'} className="space-y-1">
-              <h3 className="font-medium text-muted text-sm">{group.trip?.name ?? 'No trip'}</h3>
-              <ul className="divide-y divide-line overflow-hidden rounded-2xl bg-raised ring-1 ring-line">
+            <div key={group.trip?.id ?? 'none'} className="space-y-1.5">
+              <h3 className="px-1 font-semibold text-muted text-xs uppercase tracking-widest">
+                {group.trip?.name ?? 'No trip'}
+              </h3>
+              <ul className="divide-y divide-line overflow-hidden rounded-3xl bg-raised shadow-sm ring-1 ring-line">
                 {group.entries.map((entry) => (
                   <li key={entry.id}>
                     <EntryRow
                       entry={entry}
+                      accuracyTargetM={settings?.accuracyTargetM ?? defaultSettings.accuracyTargetM}
                       photos={photoCounts?.get(entry.id) ?? 0}
                       onOpen={() => setOpenId(entry.id)}
                     />
@@ -89,10 +93,12 @@ export function EntriesScreen() {
 
 function EntryRow({
   entry,
+  accuracyTargetM,
   photos,
   onOpen,
 }: {
   readonly entry: Entry;
+  readonly accuracyTargetM: number;
   readonly photos: number;
   readonly onOpen: () => void;
 }) {
@@ -100,16 +106,18 @@ function EntryRow({
     <button
       type="button"
       onClick={onOpen}
-      className="flex min-h-14 w-full items-center gap-3 px-4 py-2 text-left"
+      className="flex min-h-16 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface"
     >
-      <span className="w-20 shrink-0 text-sm tabular-nums">
+      <span className="w-18 shrink-0 font-mono text-sm tabular-nums">
         {formatLoggedClock(entry.loggedAt, entry)}
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="block truncate font-medium">{entry.label ?? 'Untitled'}</span>
-        <span className="block text-muted text-sm">
-          {entry.frame !== null && `Frame ${entry.frame} · `}
-          {formatAccuracy(entry.accuracyM)}
+      <span className="min-w-0 flex-1 space-y-1">
+        <span className={`block truncate font-medium ${entry.label === null ? 'text-muted' : ''}`}>
+          {entry.label ?? 'Untitled'}
+        </span>
+        <span className="flex items-center gap-2 text-muted text-sm">
+          <AccuracyPill accuracyM={entry.accuracyM} targetM={accuracyTargetM} />
+          {entry.frame !== null && <span>Frame {entry.frame}</span>}
         </span>
       </span>
       {photos > 0 && (
