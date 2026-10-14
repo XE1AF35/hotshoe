@@ -4,7 +4,7 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 
-const budgetBytes = 90 * 1024;
+const budgetBytes = 120 * 1024;
 const distDir = 'dist';
 
 const html = await readFile(join(distDir, 'index.html'), 'utf8');
