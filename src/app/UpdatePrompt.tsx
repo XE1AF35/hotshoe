@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 
 /**
  * Registers the service worker and offers new versions without forcing a reload, so an update
- * never interrupts logging.
+ * never interrupts logging. Shown at the top so it never covers the Log button.
  */
 export function UpdatePrompt() {
   const {
@@ -33,7 +33,7 @@ export function UpdatePrompt() {
   return (
     <div
       role="status"
-      className="fixed inset-x-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 mx-auto flex max-w-md items-center gap-3 rounded-xl bg-ink px-4 py-3 text-sm text-surface shadow-lg"
+      className="fixed inset-x-4 top-[max(0.75rem,env(safe-area-inset-top))] z-20 mx-auto flex max-w-md items-center gap-3 rounded-xl bg-ink px-4 py-3 text-sm text-surface shadow-lg"
     >
       {needRefresh ? (
         <>
