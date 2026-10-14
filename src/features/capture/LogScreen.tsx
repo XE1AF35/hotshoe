@@ -1,7 +1,12 @@
+import { useEffect, useState } from 'react';
+import { CameraIcon } from '../../app/icons.tsx';
+import { useDb } from '../../db/DbProvider.tsx';
 import { useLatestEntry, useSettings } from '../../db/hooks.ts';
 import type { Entry } from '../../db/schema.ts';
 import type { Settings } from '../../db/settings.ts';
 import { formatAccuracy } from '../../lib/format.ts';
+import { attachPhotos, attachProblemMessage } from '../photos/attach.ts';
+import { usePhotoInputs } from '../photos/usePhotoInputs.tsx';
 import { ActiveTripPicker } from '../trips/ActiveTripPicker.tsx';
 import { CaptureProblem } from './CaptureProblem.tsx';
 import type { CaptureState } from './capture.ts';
@@ -31,14 +36,48 @@ function LogScreenBody({
   readonly settings: Settings;
   readonly latest: Entry | null;
 }) {
+  const db = useDb();
   const capture = useCapture({ settings });
   const { state } = capture;
   const justSaved = state.status === 'saved' && latest?.id === state.entryId;
+
+  // Photos from "Log with photo" wait here until their entry is saved. If the fix fails they keep
+  // waiting for the next successful log, since camera photos taken here are not in Photos.
+  const [pendingPhotos, setPendingPhotos] = useState<File[]>([]);
+  const [photoMessage, setPhotoMessage] = useState<string | null>(null);
+  const camera = usePhotoInputs((files) => setPendingPhotos((waiting) => [...waiting, ...files]));
+
+  const savedEntryId = state.status === 'saved' ? state.entryId : null;
+  useEffect(() => {
+    if (savedEntryId === null || pendingPhotos.length === 0) return;
+    const files = pendingPhotos;
+    setPendingPhotos([]);
+    setPhotoMessage('Adding photo…');
+    attachPhotos(db, savedEntryId, files, settings.photoQuality, 'camera')
+      .then((result) => setPhotoMessage(attachProblemMessage(result.problem)))
+      .catch(() => setPhotoMessage("Couldn't add the photo."));
+  }, [savedEntryId, pendingPhotos, db, settings.photoQuality]);
+
+  function startWithPhoto() {
+    setPhotoMessage(null);
+    capture.start();
+    camera.openCamera();
+  }
 
   return (
     <>
       <ActiveTripPicker activeTripId={settings.activeTripId} />
       {state.status === 'failed' && <CaptureProblem reason={state.reason} />}
+      {pendingPhotos.length > 0 && state.status !== 'locating' && state.status !== 'saving' && (
+        <p role="status" className="rounded-2xl bg-warning p-4 text-on-warning text-sm">
+          Your photo is waiting. Tap Log location and it will be added to that entry.
+        </p>
+      )}
+      {photoMessage && (
+        <p role="status" className="text-sm">
+          {photoMessage}
+        </p>
+      )}
 
       {latest ? (
         <EntryCard
@@ -61,10 +100,12 @@ function LogScreenBody({
           compact={latest !== null}
           targetM={settings.accuracyTargetM}
           onStart={capture.start}
+          onStartWithPhoto={startWithPhoto}
           onAccept={capture.accept}
           onCancel={capture.cancel}
         />
       </div>
+      {camera.inputs}
     </>
   );
 }
@@ -74,6 +115,7 @@ function CaptureControls({
   compact,
   targetM,
   onStart,
+  onStartWithPhoto,
   onAccept,
   onCancel,
 }: {
@@ -82,6 +124,7 @@ function CaptureControls({
   readonly compact: boolean;
   readonly targetM: number;
   readonly onStart: () => void;
+  readonly onStartWithPhoto: () => void;
   readonly onAccept: () => void;
   readonly onCancel: () => void;
 }) {
@@ -117,13 +160,23 @@ function CaptureControls({
           </button>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={onStart}
-          className={`flex ${compact ? 'min-h-32' : 'min-h-40'} w-full items-center justify-center rounded-3xl bg-accent font-semibold text-2xl text-on-accent shadow-md active:scale-[0.98] motion-safe:transition-transform`}
-        >
-          Log location
-        </button>
+        <div className="grid grid-cols-[1fr_7rem] gap-3">
+          <button
+            type="button"
+            onClick={onStart}
+            className={`flex ${compact ? 'min-h-32' : 'min-h-40'} items-center justify-center rounded-3xl bg-accent font-semibold text-2xl text-on-accent shadow-md active:scale-[0.98] motion-safe:transition-transform`}
+          >
+            Log location
+          </button>
+          <button
+            type="button"
+            onClick={onStartWithPhoto}
+            className="flex flex-col items-center justify-center gap-1 rounded-3xl border-2 border-accent bg-raised font-semibold text-sm active:scale-[0.98] motion-safe:transition-transform"
+          >
+            <CameraIcon className="size-8" />
+            Log with photo
+          </button>
+        </div>
       )}
     </div>
   );

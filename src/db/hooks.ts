@@ -1,7 +1,8 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useDb } from './DbProvider.tsx';
 import { listEntries } from './entries.ts';
-import type { Entry, Trip, TripId } from './schema.ts';
+import { listPhotos } from './photos.ts';
+import type { Entry, EntryId, Photo, Trip, TripId } from './schema.ts';
 import { getSettings, type Settings } from './settings.ts';
 import { listTrips } from './trips.ts';
 
@@ -38,6 +39,25 @@ export function useTripEntryCounts(): Map<TripId, number> | undefined {
     await db.entries.orderBy('tripId').eachKey((key) => {
       const tripId = key as TripId;
       counts.set(tripId, (counts.get(tripId) ?? 0) + 1);
+    });
+    return counts;
+  }, [db]);
+}
+
+/** An entry's photos, oldest first. Undefined while loading. */
+export function usePhotos(entryId: EntryId): Photo[] | undefined {
+  const db = useDb();
+  return useLiveQuery(() => listPhotos(db, entryId), [db, entryId]);
+}
+
+/** How many photos each entry has, read from the index alone. Undefined while loading. */
+export function usePhotoCounts(): Map<EntryId, number> | undefined {
+  const db = useDb();
+  return useLiveQuery(async () => {
+    const counts = new Map<EntryId, number>();
+    await db.photos.orderBy('entryId').eachKey((key) => {
+      const entryId = key as EntryId;
+      counts.set(entryId, (counts.get(entryId) ?? 0) + 1);
     });
     return counts;
   }, [db]);

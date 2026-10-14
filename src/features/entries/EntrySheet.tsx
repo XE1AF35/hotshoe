@@ -6,6 +6,7 @@ import { type Entry, limits, type Trip } from '../../db/schema.ts';
 import { type CoordFormat, formatCoords } from '../../lib/coords.ts';
 import { formatAccuracy, formatLoggedTime } from '../../lib/format.ts';
 import { CopyCoordsButton } from '../capture/CopyCoordsButton.tsx';
+import { PhotoStrip } from '../photos/PhotoStrip.tsx';
 import { TripSelect } from '../trips/TripSelect.tsx';
 
 export function EntrySheet({
@@ -122,6 +123,11 @@ function EntryForm({
           </label>
           <TripSelect id={ids.trip} trips={trips} value={tripId} onChange={setTripId} />
         </div>
+      </div>
+
+      <div className="space-y-1">
+        <h3 className="font-medium text-sm">Photos</h3>
+        <PhotoStrip entryId={entry.id} />
       </div>
 
       {error && (

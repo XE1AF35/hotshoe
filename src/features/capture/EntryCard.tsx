@@ -2,6 +2,7 @@ import type { Entry } from '../../db/schema.ts';
 import type { CoordFormat } from '../../lib/coords.ts';
 import { formatCoords } from '../../lib/coords.ts';
 import { formatAccuracy, formatLoggedTime } from '../../lib/format.ts';
+import { PhotoStrip } from '../photos/PhotoStrip.tsx';
 import { CopyCoordsButton } from './CopyCoordsButton.tsx';
 import { looksImprecise } from './capture.ts';
 import { QuickFields } from './QuickFields.tsx';
@@ -42,6 +43,7 @@ export function EntryCard({
       </div>
       <CopyCoordsButton coords={entry} format={coordFormat} />
       <QuickFields entry={entry} />
+      <PhotoStrip entryId={entry.id} />
     </section>
   );
 }

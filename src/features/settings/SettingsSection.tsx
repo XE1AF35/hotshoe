@@ -1,7 +1,12 @@
 import { useId } from 'react';
 import { useDb } from '../../db/DbProvider.tsx';
 import { useSettings } from '../../db/hooks.ts';
-import { type SettingKey, type Settings, setSetting } from '../../db/settings.ts';
+import {
+  type PhotoQuality,
+  type SettingKey,
+  type Settings,
+  setSetting,
+} from '../../db/settings.ts';
 import { type CoordFormat, formatCoords } from '../../lib/coords.ts';
 
 const example = { lat: -36.848461, lon: 174.763336 };
@@ -42,6 +47,32 @@ export function SettingsSection() {
               {format === 'decimal' ? 'Decimal degrees' : 'Degrees, minutes, seconds'}
               <span className="block font-mono text-muted text-sm">
                 {formatCoords(example, format)}
+              </span>
+            </span>
+          </label>
+        ))}
+      </fieldset>
+
+      <fieldset className="space-y-1">
+        <legend className="mb-1 font-medium text-sm">Photo size</legend>
+        {(['standard', 'high'] as const satisfies readonly PhotoQuality[]).map((quality) => (
+          <label
+            key={quality}
+            className="flex min-h-12 items-center gap-3 rounded-xl px-3 has-checked:bg-raised"
+          >
+            <input
+              type="radio"
+              name="photo-quality"
+              checked={settings.photoQuality === quality}
+              onChange={() => save('photoQuality', quality)}
+              className="size-5 accent-accent-ink"
+            />
+            <span>
+              {quality === 'standard' ? 'Standard' : 'High quality'}
+              <span className="block text-muted text-sm">
+                {quality === 'standard'
+                  ? '1,600 px, about 300 KB a photo'
+                  : '2,560 px, about 800 KB a photo'}
               </span>
             </span>
           </label>

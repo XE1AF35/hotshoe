@@ -1,8 +1,9 @@
 import { useCallback, useMemo, useState } from 'react';
+import { CameraIcon } from '../../app/icons.tsx';
 import { Toast } from '../../app/Toast.tsx';
 import { useDb } from '../../db/DbProvider.tsx';
 import { type DeletedEntry, restoreEntry } from '../../db/entries.ts';
-import { useEntries, useSettings, useTrips } from '../../db/hooks.ts';
+import { useEntries, usePhotoCounts, useSettings, useTrips } from '../../db/hooks.ts';
 import type { Entry, EntryId, Trip, TripId } from '../../db/schema.ts';
 import { formatAccuracy, formatDay, formatLoggedClock } from '../../lib/format.ts';
 import { EntrySheet } from './EntrySheet.tsx';
@@ -13,6 +14,7 @@ export function EntriesScreen() {
   const entries = useEntries();
   const trips = useTrips();
   const settings = useSettings();
+  const photoCounts = usePhotoCounts();
   const [openId, setOpenId] = useState<EntryId | null>(null);
   const [deleted, setDeleted] = useState<DeletedEntry | null>(null);
   const dismissToast = useCallback(() => setDeleted(null), []);
@@ -47,7 +49,11 @@ export function EntriesScreen() {
               <ul className="divide-y divide-line overflow-hidden rounded-2xl bg-raised ring-1 ring-line">
                 {group.entries.map((entry) => (
                   <li key={entry.id}>
-                    <EntryRow entry={entry} onOpen={() => setOpenId(entry.id)} />
+                    <EntryRow
+                      entry={entry}
+                      photos={photoCounts?.get(entry.id) ?? 0}
+                      onOpen={() => setOpenId(entry.id)}
+                    />
                   </li>
                 ))}
               </ul>
@@ -81,7 +87,15 @@ export function EntriesScreen() {
   );
 }
 
-function EntryRow({ entry, onOpen }: { readonly entry: Entry; readonly onOpen: () => void }) {
+function EntryRow({
+  entry,
+  photos,
+  onOpen,
+}: {
+  readonly entry: Entry;
+  readonly photos: number;
+  readonly onOpen: () => void;
+}) {
   return (
     <button
       type="button"
@@ -98,6 +112,13 @@ function EntryRow({ entry, onOpen }: { readonly entry: Entry; readonly onOpen: (
           {formatAccuracy(entry.accuracyM)}
         </span>
       </span>
+      {photos > 0 && (
+        <span className="flex items-center gap-1 text-muted text-sm">
+          <CameraIcon className="size-4" />
+          {photos}
+          <span className="sr-only">{photos === 1 ? 'photo' : 'photos'}</span>
+        </span>
+      )}
     </button>
   );
 }
