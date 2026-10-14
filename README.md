@@ -24,6 +24,17 @@ pnpm test:e2e           # end-to-end tests in WebKit with an iPhone viewport
 
 Playwright's WebKit build needs Ubuntu or Debian system libraries. On other Linux distributions, run `pnpm test:e2e:chromium` locally instead; CI always runs the WebKit suite.
 
+### Build options
+
+- `BASE_PATH`: the path the app is served from. Defaults to `/hotshoe/` for GitHub Pages. Use `/` for a custom domain.
+- `PWA_SELF_DESTROY=true`: builds a service worker that removes itself and its caches. Deploy this only to recover from a broken release, then deploy a normal build.
+
+Everything Hotshoe stores in the browser (the database and caches) is named with a `hotshoe` prefix, so it never clashes with other apps served from the same address.
+
+### Icons
+
+The app icons in `public/` are made from `public/favicon.svg`. After changing the SVG, run `pnpm dlx @vite-pwa/assets-generator@2.0.0` and commit the results.
+
 ## Licence
 
 [MIT](LICENSE)
