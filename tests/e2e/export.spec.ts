@@ -17,7 +17,7 @@ test('exports a logged entry as GPX and as CSV', async ({ page }) => {
   await page.getByLabel('Label').press('Enter');
 
   await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'More' }).click();
-  await expect(page.getByLabel('Entries')).toHaveValue('all');
+  await expect(page.getByLabel('Entries', { exact: true })).toHaveValue('all');
   await expect(page.getByRole('radio', { name: /^GPX/ })).toBeChecked();
 
   let download = page.waitForEvent('download');
