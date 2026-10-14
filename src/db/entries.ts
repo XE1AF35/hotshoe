@@ -7,7 +7,14 @@ import {
   normaliseText,
   withStorageErrors,
 } from './errors.ts';
-import { type Entry, type EntryId, limits, newEntryId, type Photo, type TripId } from './schema.ts';
+import {
+  type Entry,
+  type EntryId,
+  limits,
+  newEntryId,
+  type StoredPhoto,
+  type TripId,
+} from './schema.ts';
 
 export interface NewEntry extends LatLon, TimeContext {
   readonly loggedAt: number;
@@ -29,7 +36,7 @@ export interface EntryPatch {
 /** Everything removed by deleteEntry, so the delete can be undone. */
 export interface DeletedEntry {
   readonly entry: Entry;
-  readonly photos: readonly Photo[];
+  readonly photos: readonly StoredPhoto[];
 }
 
 export async function addEntry(db: HotshoeDb, input: NewEntry, now = Date.now()): Promise<Entry> {

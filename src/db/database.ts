@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie';
-import type { Entry, Photo, Trip } from './schema.ts';
+import type { Entry, StoredPhoto, Trip } from './schema.ts';
 
 export interface MetaRow {
   readonly key: string;
@@ -10,7 +10,7 @@ export class HotshoeDb extends Dexie {
   // `declare` keeps these as types only, so class fields do not overwrite the tables Dexie creates.
   declare entries: EntityTable<Entry, 'id'>;
   declare trips: EntityTable<Trip, 'id'>;
-  declare photos: EntityTable<Photo, 'id'>;
+  declare photos: EntityTable<StoredPhoto, 'id'>;
   declare meta: EntityTable<MetaRow, 'key'>;
 
   constructor(name = 'hotshoe') {

@@ -90,10 +90,6 @@ describe('PhotoStrip', () => {
   it('adds photos from the library and removes one after confirming', async () => {
     const db = createTestDb();
     const entry = await addEntry(db, newEntryInput());
-    // fake-indexeddb clones happy-dom's Blobs into plain objects, which Node's
-    // URL.createObjectURL rejects. Real browsers hand back Blobs.
-    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test');
-    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
     const { container } = renderWithDb(db, <PhotoStrip entryId={entry.id} />);
 
     const libraryInput = container.querySelector('input[multiple]');

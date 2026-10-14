@@ -19,7 +19,7 @@ function photoInput(entryId: EntryId, overrides: Partial<NewPhoto> = {}): NewPho
 }
 
 describe('photos', () => {
-  it('stores image blobs and reads them back intact', async () => {
+  it('stores the JPEGs as bytes and reads them back as intact blobs', async () => {
     const db = createTestDb();
     const entry = await addEntry(db, newEntryInput());
     const photo = await addPhoto(db, photoInput(entry.id));
@@ -31,6 +31,11 @@ describe('photos', () => {
     expect([...bytes.slice(0, 3)]).toEqual([0xff, 0xd8, 0xff]);
     expect(bytes.byteLength).toBe(400);
     expect(stored?.id).toBe(photo.id);
+
+    // No Blobs in the database itself: WebKit can't store them in private sessions.
+    const row = await db.photos.get(photo.id);
+    expect(row?.image).toBeInstanceOf(ArrayBuffer);
+    expect(row?.thumb).toBeInstanceOf(ArrayBuffer);
   });
 
   it("lists only that entry's photos, oldest first", async () => {

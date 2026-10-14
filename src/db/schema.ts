@@ -49,6 +49,15 @@ export interface Photo {
   readonly createdAt: number;
 }
 
+/**
+ * A photo as kept in IndexedDB, with its JPEGs as raw bytes. WebKit can't store Blobs in private
+ * browsing sessions, but it can store ArrayBuffers everywhere.
+ */
+export interface StoredPhoto extends Omit<Photo, 'image' | 'thumb'> {
+  readonly image: ArrayBuffer;
+  readonly thumb: ArrayBuffer;
+}
+
 export const limits = {
   labelLength: 200,
   frameLength: 40,
