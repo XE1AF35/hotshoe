@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { captureTimeContext, localDayKey } from './time.ts';
+import { captureTimeContext, formatUtcOffset, localDayKey } from './time.ts';
 
 const nz = { timeZone: 'Pacific/Auckland', utcOffsetMin: 720 };
 
@@ -51,5 +51,16 @@ describe('captureTimeContext', () => {
       timeZone: 'America/Los_Angeles',
       utcOffsetMin: -420,
     });
+  });
+});
+
+describe('formatUtcOffset', () => {
+  it.each([
+    [0, 'UTC'],
+    [780, 'UTC+13:00'],
+    [-210, 'UTC-03:30'],
+    [345, 'UTC+05:45'],
+  ])('%i minutes is %s', (minutes, text) => {
+    expect(formatUtcOffset(minutes)).toBe(text);
   });
 });

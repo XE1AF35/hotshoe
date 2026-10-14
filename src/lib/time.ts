@@ -63,6 +63,15 @@ export function formatLocalIso(epochMs: number, utcOffsetMin: number): string {
   return `${local}${sign}${hours}:${minutes}`;
 }
 
+/** `UTC+13:00`, `UTC-03:30`, or `UTC` for an offset in minutes. */
+export function formatUtcOffset(offsetMin: number): string {
+  if (offsetMin === 0) return 'UTC';
+  const sign = offsetMin < 0 ? '-' : '+';
+  const hours = String(Math.floor(Math.abs(offsetMin) / 60)).padStart(2, '0');
+  const minutes = String(Math.abs(offsetMin) % 60).padStart(2, '0');
+  return `UTC${sign}${hours}:${minutes}`;
+}
+
 /** An instant in UTC to whole seconds: `2026-10-14T03:12:45Z`. */
 export function formatUtcIso(epochMs: number): string {
   return `${new Date(epochMs).toISOString().slice(0, 19)}Z`;

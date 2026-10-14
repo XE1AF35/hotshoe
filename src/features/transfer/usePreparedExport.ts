@@ -12,7 +12,13 @@ const loadExporter = () => import('./exportFile.ts');
  * from a tap, so there is no time to read the database in between. The file is remade when the
  * format, the scope, or `changes` (the entries, say) change.
  */
-export function usePreparedExport(format: ExportFormat, scope: ExportScope, changes: unknown) {
+export function usePreparedExport(
+  format: ExportFormat,
+  scope: ExportScope,
+  changes: unknown,
+  /** Minutes from UTC set in the photo software, to match a camera clock, or null for UTC. */
+  softwareUtcOffsetMin: number | null = null,
+) {
   const db = useDb();
   const [ready, setReady] = useState<CreatedExport | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -28,7 +34,13 @@ export function usePreparedExport(format: ExportFormat, scope: ExportScope, chan
     setError(null);
     setMessage(null);
     loadExporter()
-      .then(({ createExport }) => createExport(db, { format, scope }))
+      .then(({ createExport }) =>
+        createExport(db, {
+          format,
+          scope,
+          cameraTime: softwareUtcOffsetMin === null ? null : { softwareUtcOffsetMin },
+        }),
+      )
       .then((created) => {
         if (current) setReady(created);
       })
@@ -38,7 +50,7 @@ export function usePreparedExport(format: ExportFormat, scope: ExportScope, chan
     return () => {
       current = false;
     };
-  }, [db, format, scopeKey, changes]);
+  }, [db, format, scopeKey, changes, softwareUtcOffsetMin]);
 
   async function share() {
     if (!ready) return;

@@ -4,9 +4,10 @@
  * entries oldest first, and rounds coordinates to six decimal places.
  */
 
-import type { Entry, PhotoId } from '../../db/schema.ts';
+import type { CameraClock, Entry, PhotoId } from '../../db/schema.ts';
 import { formatDegrees } from '../../lib/coords.ts';
-import { formatLocalIso, formatUtcIso, localDayKey } from '../../lib/time.ts';
+import { formatLocalIso, formatUtcIso, formatUtcOffset, localDayKey } from '../../lib/time.ts';
+import { toCameraTime } from '../trips/cameraClock.ts';
 
 export type ExportFormat = 'csv' | 'geojson' | 'gpx';
 
@@ -24,10 +25,21 @@ export const formatDetails: Record<ExportFormat, { extension: string; mimeType: 
   gpx: { extension: 'gpx', mimeType: 'application/gpx+xml' },
 };
 
+export interface ExportOptions {
+  /** GPX only: match times to this camera clock, so drift and a wrong time zone don't matter. */
+  readonly cameraClock?: CameraClock | null;
+  /**
+   * With a camera clock: the time zone the person sets in their photo software, in minutes from
+   * UTC. The software reads the camera's times as being in this zone.
+   */
+  readonly softwareUtcOffsetMin?: number;
+}
+
 export function formatExport(
   format: ExportFormat,
   rows: readonly ExportRow[],
   now: number,
+  { cameraClock = null, softwareUtcOffsetMin = 0 }: ExportOptions = {},
 ): string {
   const sorted = [...rows].sort((a, b) => a.entry.loggedAt - b.entry.loggedAt);
   switch (format) {
@@ -36,7 +48,7 @@ export function formatExport(
     case 'geojson':
       return toGeoJson(sorted);
     case 'gpx':
-      return toGpx(sorted, now);
+      return toGpx(sorted, now, cameraClock, softwareUtcOffsetMin);
   }
 }
 
@@ -142,7 +154,20 @@ function toGeoJson(rows: readonly ExportRow[]): string {
  * One track per trip and one segment per local day, so photo software doesn't draw a line, and
  * guess positions, between days. Every point is also a waypoint, for apps that only show those.
  */
-function toGpx(rows: readonly ExportRow[], now: number): string {
+function toGpx(
+  rows: readonly ExportRow[],
+  now: number,
+  cameraClock: CameraClock | null,
+  softwareUtcOffsetMin: number,
+): string {
+  // Photo software turns a camera time into UTC by taking off the zone it is told, so a matched
+  // time is what the camera read, less that zone.
+  const pointTime = (entry: Entry) =>
+    formatUtcIso(
+      cameraClock
+        ? toCameraTime(entry.loggedAt, cameraClock) - softwareUtcOffsetMin * 60_000
+        : entry.loggedAt,
+    );
   const trips = new Map<string | null, ExportRow[]>();
   for (const row of rows) {
     const group = trips.get(row.tripName);
@@ -153,13 +178,15 @@ function toGpx(rows: readonly ExportRow[], now: number): string {
   const lines = [
     '<?xml version="1.0" encoding="UTF-8"?>',
     '<gpx version="1.1" creator="Hotshoe" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">',
-    `  <metadata><time>${formatUtcIso(now)}</time></metadata>`,
+    cameraClock
+      ? `  <metadata><desc>Times are matched to the camera's clock: set the time zone to ${formatUtcOffset(softwareUtcOffsetMin)} when geotagging.</desc><time>${formatUtcIso(now)}</time></metadata>`
+      : `  <metadata><time>${formatUtcIso(now)}</time></metadata>`,
   ];
 
   for (const row of rows) {
     const name = waypointName(row.entry);
     lines.push(
-      `  <wpt ${gpxPosition(row.entry)}>${gpxPointBody(row.entry)}${name === null ? '' : `<name>${xml(name)}</name>`}</wpt>`,
+      `  <wpt ${gpxPosition(row.entry)}>${gpxPointBody(row.entry, pointTime)}${name === null ? '' : `<name>${xml(name)}</name>`}</wpt>`,
     );
   }
 
@@ -173,7 +200,7 @@ function toGpx(rows: readonly ExportRow[], now: number): string {
         lines.push('    <trkseg>');
         day = entryDay;
       }
-      lines.push(`      <trkpt ${gpxPosition(entry)}>${gpxPointBody(entry)}</trkpt>`);
+      lines.push(`      <trkpt ${gpxPosition(entry)}>${gpxPointBody(entry, pointTime)}</trkpt>`);
     }
     lines.push('    </trkseg>', '  </trk>');
   }
@@ -187,9 +214,9 @@ function gpxPosition(entry: Entry): string {
 }
 
 /** `<ele>` when the altitude is known, then `<time>`, in the order the GPX schema requires. */
-function gpxPointBody(entry: Entry): string {
+function gpxPointBody(entry: Entry, pointTime: (entry: Entry) => string): string {
   const ele = entry.altitudeM === null ? '' : `<ele>${metres(entry.altitudeM)}</ele>`;
-  return `${ele}<time>${formatUtcIso(entry.loggedAt)}</time>`;
+  return `${ele}<time>${pointTime(entry)}</time>`;
 }
 
 function waypointName(entry: Entry): string | null {

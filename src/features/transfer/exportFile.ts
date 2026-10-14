@@ -16,8 +16,18 @@ export async function createExport(
   {
     format,
     scope,
+    cameraTime = null,
     now = Date.now(),
-  }: { readonly format: ExportFormat; readonly scope: ExportScope; readonly now?: number },
+  }: {
+    readonly format: ExportFormat;
+    readonly scope: ExportScope;
+    /**
+     * For a trip with a measured camera clock: match GPX times to that camera, for photo software
+     * set to this time zone (minutes from UTC). Null leaves times in plain UTC.
+     */
+    readonly cameraTime?: { readonly softwareUtcOffsetMin: number } | null;
+    readonly now?: number;
+  },
 ): Promise<CreatedExport> {
   const [trips, entries, photoIds] = await db.transaction(
     'r',
@@ -33,6 +43,10 @@ export async function createExport(
     photoIds: photoIds.get(entry.id) ?? [],
   }));
 
+  const cameraClock =
+    cameraTime !== null && format === 'gpx' && typeof scope === 'string' && scope !== 'all'
+      ? (trips.find((trip) => trip.id === scope)?.cameraClock ?? null)
+      : null;
   const { extension, mimeType } = formatDetails[format];
   const scopeName =
     scope === 'all'
@@ -40,9 +54,18 @@ export async function createExport(
       : typeof scope === 'object'
         ? 'selection'
         : slug(tripNames.get(scope) ?? 'trip');
-  const name = `hotshoe-${scopeName}-${fileDateStamp(now)}.${extension}`;
+  const name = `hotshoe-${scopeName}-${fileDateStamp(now)}${cameraClock ? '-camera-time' : ''}.${extension}`;
   return {
-    file: new File([formatExport(format, rows, now)], name, { type: mimeType }),
+    file: new File(
+      [
+        formatExport(format, rows, now, {
+          cameraClock,
+          softwareUtcOffsetMin: cameraTime?.softwareUtcOffsetMin ?? 0,
+        }),
+      ],
+      name,
+      { type: mimeType },
+    ),
     entries: rows.length,
   };
 }

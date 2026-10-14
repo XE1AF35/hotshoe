@@ -1,7 +1,9 @@
-import { useEffect, useId, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { ShareIcon } from '../../app/icons.tsx';
 import { useEntries, useTripEntryCounts, useTrips } from '../../db/hooks.ts';
 import type { TripId } from '../../db/schema.ts';
+import { formatUtcOffset } from '../../lib/time.ts';
+import { describeCameraClock, utcOffsetChoices } from '../trips/cameraClock.ts';
 import type { ExportFormat } from './formats.ts';
 import { usePreparedExport } from './usePreparedExport.ts';
 
@@ -19,7 +21,28 @@ export function ExportSection() {
   const scopeId = useId();
   const [scope, setScope] = useState<'all' | TripId>('all');
   const [format, setFormat] = useState<ExportFormat>('gpx');
-  const { ready, message, error, share } = usePreparedExport(format, scope, entries);
+  const [cameraTime, setCameraTime] = useState(true);
+  const [chosenZone, setChosenZone] = useState<number | null>(null);
+  const cameraTimeId = useId();
+  const zoneId = useId();
+  const clock =
+    scope === 'all' ? null : (trips?.find((trip) => trip.id === scope)?.cameraClock ?? null);
+  const offerCameraTime = clock !== null && format === 'gpx';
+  // The zone most people already enter in their photo software: where they were when they
+  // measured the clock.
+  const softwareZone = chosenZone ?? clock?.phoneUtcOffsetMin ?? 0;
+  const zoneChoices = [...new Set([...utcOffsetChoices, softwareZone])].sort((a, b) => a - b);
+  // Remade when entries or trips change, such as a newly measured camera clock.
+  const changes = useMemo(
+    () => (entries && trips ? [entries, trips] : undefined),
+    [entries, trips],
+  );
+  const { ready, message, error, share } = usePreparedExport(
+    format,
+    scope,
+    changes,
+    offerCameraTime && cameraTime ? softwareZone : null,
+  );
 
   // A trip that has been deleted can't be exported, so fall back to everything.
   useEffect(() => {
@@ -79,6 +102,47 @@ export function ExportSection() {
             </label>
           ))}
         </fieldset>
+
+        {offerCameraTime && (
+          <div className="space-y-3">
+            <label htmlFor={cameraTimeId} className="flex min-h-11 items-start gap-3 px-3">
+              <input
+                id={cameraTimeId}
+                type="checkbox"
+                checked={cameraTime}
+                onChange={(event) => setCameraTime(event.target.checked)}
+                className="mt-0.5 size-5 shrink-0 accent-accent-ink"
+              />
+              <span>
+                Match this trip's camera clock
+                <span className="block text-muted text-sm">{describeCameraClock(clock)}</span>
+              </span>
+            </label>
+            {cameraTime && (
+              <div className="space-y-1 px-3">
+                <label htmlFor={zoneId} className="block font-medium text-sm">
+                  Time zone you set in your photo software
+                </label>
+                <select
+                  id={zoneId}
+                  value={softwareZone}
+                  onChange={(event) => setChosenZone(Number(event.target.value))}
+                  className="min-h-12 w-full rounded-xl border border-line bg-surface px-3 text-base"
+                >
+                  {zoneChoices.map((minutes) => (
+                    <option key={minutes} value={minutes}>
+                      {formatUtcOffset(minutes)}
+                      {minutes === clock.phoneUtcOffsetMin ? ' (this iPhone)' : ''}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-muted text-sm">
+                  Use the same zone when geotagging, and your photos will line up.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
 
         <button
           type="button"

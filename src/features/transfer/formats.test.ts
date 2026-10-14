@@ -112,6 +112,24 @@ describe('formatExport', () => {
     expect(gpx).toContain('<name>Waiheke &amp; &lt;Rakino&gt;</name>');
   });
 
+  it("matches GPX times to a camera's clock for the time zone set in photo software", () => {
+    // The camera is on Auckland time (UTC+13) and runs 2 min 4 s fast.
+    const cameraClock = { offsetS: 46_800 + 124, phoneUtcOffsetMin: 780, measuredAt: 0 };
+
+    // Set to UTC+13 in the software: true UTC plus the drift. 01:00:00 becomes 01:02:04.
+    const local = formatExport('gpx', rows, now, { cameraClock, softwareUtcOffsetMin: 780 });
+    expect(local).toContain('<time>2026-10-14T01:02:04Z</time>');
+    expect(local).toContain('set the time zone to UTC+13:00 when geotagging');
+
+    // Set to UTC: the camera's own reading, 14:02:04.
+    const utc = formatExport('gpx', rows, now, { cameraClock, softwareUtcOffsetMin: 0 });
+    expect(utc).toContain('<time>2026-10-14T14:02:04Z</time>');
+    expect(utc).toContain('set the time zone to UTC when geotagging');
+    expect(formatExport('csv', rows, now, { cameraClock: null })).toBe(
+      formatExport('csv', rows, now),
+    );
+  });
+
   it('writes empty but valid files when there is nothing to export', () => {
     expect(formatExport('csv', [], now)).toBe(
       '﻿id,logged_at_utc,logged_at_local,time_zone,latitude,longitude,accuracy_m,altitude_m,label,frame,trip,photos\r\n',
