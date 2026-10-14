@@ -1,11 +1,71 @@
 @import "tailwindcss";
 
+/*
+ * Colour tokens. Components use these names (bg-surface, text-ink, and so on) rather than raw
+ * colours, so light and dark mode stay in step. Text pairs meet WCAG AA contrast in both modes.
+ */
+@theme inline {
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-accent-ink: var(--accent-ink);
+  --color-warning: var(--warning);
+  --color-on-warning: var(--on-warning);
+  --color-danger-ink: var(--danger-ink);
+}
+
+:root {
+  --surface: #fafaf9;
+  --raised: #ffffff;
+  --line: #d6d3d1;
+  --ink: #1c1917;
+  --muted: #57534e;
+  --accent: #fbbf24;
+  --on-accent: #1c1917;
+  --accent-ink: #92400e;
+  --warning: #fef3c7;
+  --on-warning: #78350f;
+  --danger-ink: #b91c1c;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #0c0a09;
+    --raised: #1c1917;
+    --line: #44403c;
+    --ink: #f5f5f4;
+    --muted: #a8a29e;
+    --accent: #fbbf24;
+    --on-accent: #1c1917;
+    --accent-ink: #fcd34d;
+    --warning: #451a03;
+    --on-warning: #fde68a;
+    --danger-ink: #fca5a5;
+  }
+}
+
 @layer base {
   html {
     color-scheme: light dark;
+    /* Follows the iOS text size setting (Dynamic Type). Other browsers ignore it. */
+    /* biome-ignore lint/a11y/useGenericFontNames: the next line sets the family, with sans-serif. */
+    font: -apple-system-body;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-text-size-adjust: 100%;
   }
 
   body {
-    @apply bg-white text-neutral-900 antialiased dark:bg-neutral-950 dark:text-neutral-100;
+    @apply bg-surface text-ink antialiased;
+    /* No grey flash when tapping links and buttons on iOS. */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Animations use Tailwind's motion-safe: variant, so reduced motion needs no override here. */
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent-ink;
   }
 }
