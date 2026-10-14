@@ -6,7 +6,14 @@ const nz = { timeZone: 'Pacific/Auckland', utcOffsetMin: 780 };
 const london = { timeZone: 'Europe/London', utcOffsetMin: 60 };
 
 function trip(id: string, name: string): Trip {
-  return { id: id as TripId, name, createdAt: 0, updatedAt: 0, archivedAt: null };
+  return {
+    id: id as TripId,
+    name,
+    createdAt: 0,
+    updatedAt: 0,
+    archivedAt: null,
+    cameraClock: null,
+  };
 }
 
 function entry(

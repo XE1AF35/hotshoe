@@ -16,6 +16,21 @@ const tripSchema = z.strictObject({
   createdAt: epochMs,
   updatedAt: epochMs,
   archivedAt: epochMs.nullable(),
+  // Added in backup version 2; earlier backups have none.
+  cameraClock: z
+    .strictObject({
+      offsetS: z
+        .int()
+        .min(-30 * 86_400)
+        .max(30 * 86_400),
+      phoneUtcOffsetMin: z
+        .int()
+        .min(-24 * 60)
+        .max(24 * 60),
+      measuredAt: epochMs,
+    })
+    .nullable()
+    .default(null),
 });
 
 const entrySchema = z.strictObject({
@@ -54,7 +69,8 @@ const photoSchema = z.strictObject({
 export const backupJsonSchema = z
   .strictObject({
     format: z.literal('hotshoe-backup'),
-    version: z.literal(1),
+    // Version 2 added trips' camera clocks. Both restore.
+    version: z.union([z.literal(1), z.literal(2)]),
     exportedAt: z.iso.datetime(),
     trips: z.array(tripSchema).max(maxItems),
     entries: z.array(entrySchema).max(maxItems),

@@ -5,7 +5,7 @@ import {
   normaliseText,
   withStorageErrors,
 } from './errors.ts';
-import { limits, newTripId, type Trip, type TripId } from './schema.ts';
+import { type CameraClock, limits, newTripId, type Trip, type TripId } from './schema.ts';
 import { getSetting, setSetting } from './settings.ts';
 
 function tripName(name: string): string {
@@ -21,6 +21,7 @@ export async function addTrip(db: HotshoeDb, name: string, now = Date.now()): Pr
     createdAt: now,
     updatedAt: now,
     archivedAt: null,
+    cameraClock: null,
   };
   await withStorageErrors(() => db.trips.add(trip));
   return trip;
@@ -52,6 +53,16 @@ export async function setTripArchived(
     if (archived) await clearActiveTripIf(db, id);
     return updated;
   });
+}
+
+/** Records how the trip's camera clock differs, or clears it with null. */
+export async function setCameraClock(
+  db: HotshoeDb,
+  id: TripId,
+  cameraClock: CameraClock | null,
+  now = Date.now(),
+): Promise<Trip> {
+  return updateTrip(db, id, (trip) => ({ ...trip, cameraClock, updatedAt: now }));
 }
 
 /** Deletes a trip. Its entries are kept and become trip-less. */

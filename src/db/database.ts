@@ -28,5 +28,16 @@ export class HotshoeDb extends Dexie {
     this.version(2).stores({
       photos: 'id, entryId, [entryId+takenAt], bytes',
     });
+    // Trips gain a camera clock, unset for trips made before.
+    this.version(3)
+      .stores({})
+      .upgrade((tx) =>
+        tx
+          .table('trips')
+          .toCollection()
+          .modify((trip: { cameraClock?: unknown }) => {
+            trip.cameraClock ??= null;
+          }),
+      );
   }
 }

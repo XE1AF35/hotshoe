@@ -4,7 +4,7 @@ import type { HotshoeDb } from '../../db/database.ts';
 import { addEntry, updateEntry } from '../../db/entries.ts';
 import { addPhoto, listPhotos } from '../../db/photos.ts';
 import { getSetting, setSetting } from '../../db/settings.ts';
-import { addTrip } from '../../db/trips.ts';
+import { addTrip, setCameraClock } from '../../db/trips.ts';
 import { createTestDb, jpegBlob, newEntryInput } from '../../test/db.ts';
 import {
   BackupError,
@@ -76,7 +76,7 @@ describe('createBackup', () => {
     const json = JSON.parse(strFromU8(files['backup.json'] ?? new Uint8Array()));
     expect(json).toMatchObject({
       format: 'hotshoe-backup',
-      version: 1,
+      version: 2,
       exportedAt: '2026-10-14T03:12:45.000Z',
     });
     expect(json.photos[0]).not.toHaveProperty('image');
@@ -128,6 +128,25 @@ describe('restoreBackup', () => {
       entries: 2,
       photos: 0,
     });
+  });
+
+  it("keeps a trip's camera clock, and restores version 1 backups without one", async () => {
+    const source = createTestDb();
+    const { trip } = await seed(source);
+    const clock = { offsetS: 46_804, phoneUtcOffsetMin: 780, measuredAt: 5000 };
+    await setCameraClock(source, trip.id, clock, 6000);
+
+    const current = createTestDb();
+    await restoreBackup(current, readBackup(await backupBytes(source)), 'merge');
+    expect((await current.trips.get(trip.id))?.cameraClock).toEqual(clock);
+
+    const older = editJson(await backupBytes(source), (json) => {
+      Object.assign(json, { version: 1 });
+      for (const saved of json.trips as Record<string, unknown>[]) delete saved.cameraClock;
+    });
+    const fromOlder = createTestDb();
+    await restoreBackup(fromOlder, readBackup(older), 'merge');
+    expect((await fromOlder.trips.get(trip.id))?.cameraClock).toBeNull();
   });
 
   it('merges by keeping the more recently edited copy of each entry', async () => {

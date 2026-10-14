@@ -4,7 +4,7 @@ import { jpegBlob } from '../test/db.ts';
 import { HotshoeDb } from './database.ts';
 import { listEntries } from './entries.ts';
 import { listPhotos, totalPhotoBytes } from './photos.ts';
-import type { EntryId } from './schema.ts';
+import type { EntryId, TripId } from './schema.ts';
 
 describe('HotshoeDb upgrades', () => {
   it('opens a version 1 database without losing anything', async () => {
@@ -34,6 +34,13 @@ describe('HotshoeDb upgrades', () => {
       createdAt: 1000,
       updatedAt: 1000,
     });
+    await v1.table('trips').add({
+      id: 't1',
+      name: 'Waiheke',
+      createdAt: 500,
+      updatedAt: 500,
+      archivedAt: null,
+    });
     await v1.table('photos').add({
       id: 'p1',
       entryId: 'e1',
@@ -53,7 +60,8 @@ describe('HotshoeDb upgrades', () => {
       expect((await listEntries(db)).map((entry) => entry.label)).toEqual(['Wharf']);
       expect(await listPhotos(db, 'e1' as EntryId)).toHaveLength(1);
       expect(await totalPhotoBytes(db)).toBe(550);
-      expect(db.verno).toBe(2);
+      expect(db.verno).toBe(3);
+      expect((await db.trips.get('t1' as TripId))?.cameraClock).toBeNull();
     } finally {
       await db.delete();
     }

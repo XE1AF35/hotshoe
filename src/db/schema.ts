@@ -30,6 +30,23 @@ export interface Trip {
   readonly createdAt: number;
   readonly updatedAt: number;
   readonly archivedAt: number | null;
+  /** How the trip's camera clock differs from real time, once measured. */
+  readonly cameraClock: CameraClock | null;
+}
+
+/**
+ * A camera clock, measured by photographing Hotshoe's clock. Cameras keep local time with no time
+ * zone, and their clocks drift, so one offset covers both.
+ */
+export interface CameraClock {
+  /**
+   * Seconds to add to a moment in UTC to get what the camera's clock read then, written as if
+   * that reading were UTC.
+   */
+  readonly offsetS: number;
+  /** This iPhone's offset from UTC when the clock was measured, to describe the difference. */
+  readonly phoneUtcOffsetMin: number;
+  readonly measuredAt: number;
 }
 
 export interface Photo {
