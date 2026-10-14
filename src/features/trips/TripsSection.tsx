@@ -6,6 +6,7 @@ import { useSettings, useTripEntryCounts, useTrips } from '../../db/hooks.ts';
 import { limits, type Trip, type TripId } from '../../db/schema.ts';
 import { setSetting } from '../../db/settings.ts';
 import { deleteTrip, renameTrip, setTripArchived } from '../../db/trips.ts';
+import { CameraClockPanel } from './CameraClockPanel.tsx';
 import { NewTripForm } from './NewTripForm.tsx';
 
 export function TripsSection() {
@@ -124,6 +125,8 @@ function TripForm({
           {error}
         </p>
       )}
+
+      <CameraClockPanel trip={trip} />
 
       <div className="grid gap-2">
         {!archived && (
