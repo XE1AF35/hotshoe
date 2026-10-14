@@ -2,6 +2,7 @@ import { useLatestEntry, useSettings } from '../../db/hooks.ts';
 import type { Entry } from '../../db/schema.ts';
 import type { Settings } from '../../db/settings.ts';
 import { formatAccuracy } from '../../lib/format.ts';
+import { ActiveTripPicker } from '../trips/ActiveTripPicker.tsx';
 import { CaptureProblem } from './CaptureProblem.tsx';
 import type { CaptureState } from './capture.ts';
 import { EntryCard } from './EntryCard.tsx';
@@ -36,6 +37,7 @@ function LogScreenBody({
 
   return (
     <>
+      <ActiveTripPicker activeTripId={settings.activeTripId} />
       {state.status === 'failed' && <CaptureProblem reason={state.reason} />}
 
       {latest ? (
