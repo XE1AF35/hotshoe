@@ -1,6 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig, type Plugin } from 'vite';
+import type { Plugin } from 'vite';
+import { defineConfig } from 'vitest/config';
 
 // Served from https://<user>.github.io/hotshoe/ on GitHub Pages.
 const base = '/hotshoe/';
@@ -36,4 +37,10 @@ function contentSecurityPolicyMeta(): Plugin {
 export default defineConfig({
   base,
   plugins: [react(), tailwindcss(), contentSecurityPolicyMeta()],
+  test: {
+    environment: 'happy-dom',
+    include: ['src/**/*.test.{ts,tsx}'],
+    setupFiles: ['src/test/setup.ts'],
+    restoreMocks: true,
+  },
 });
