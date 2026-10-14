@@ -16,6 +16,11 @@ export interface Settings {
   backupReminderDays: number;
   backupReminderEntries: number;
   persistResult: PersistResult | null;
+  /**
+   * Whether the Map tab loads the map straight away. Off by default: the map comes from
+   * OpenFreeMap, which then sees the area on screen, so loading it is a choice each time.
+   */
+  mapLoadsAutomatically: boolean;
 }
 
 export type SettingKey = keyof Settings;
@@ -30,6 +35,7 @@ export const defaultSettings: Readonly<Settings> = {
   backupReminderDays: 7,
   backupReminderEntries: 25,
   persistResult: null,
+  mapLoadsAutomatically: false,
 };
 
 const isPositiveNumber = (value: unknown): value is number =>
@@ -48,6 +54,7 @@ const guards: { [K in SettingKey]: (value: unknown) => value is Settings[K] } = 
   backupReminderEntries: isPositiveNumber,
   persistResult: (value): value is PersistResult | null =>
     value === null || value === 'granted' || value === 'denied' || value === 'unsupported',
+  mapLoadsAutomatically: (value): value is boolean => typeof value === 'boolean',
 };
 
 /** Reads a setting, falling back to the default when it is missing or not a valid value. */

@@ -16,7 +16,7 @@ const timeoutChoices = [30, 45, 60, 90, 120] as const;
 export function SettingsSection() {
   const db = useDb();
   const settings = useSettings();
-  const ids = { accuracy: useId(), timeout: useId() };
+  const ids = { accuracy: useId(), timeout: useId(), map: useId() };
   if (!settings) return null;
 
   function save<K extends SettingKey>(key: K, value: Settings[K]) {
@@ -115,6 +115,23 @@ export function SettingsSection() {
           </select>
         </div>
       </div>
+
+      <label htmlFor={ids.map} className="flex min-h-12 items-start gap-3 px-3">
+        <input
+          id={ids.map}
+          type="checkbox"
+          checked={settings.mapLoadsAutomatically}
+          onChange={(event) => save('mapLoadsAutomatically', event.target.checked)}
+          className="mt-0.5 size-5 shrink-0 accent-accent-ink"
+        />
+        <span>
+          Load the map without asking
+          <span className="block text-muted text-sm">
+            The map comes from OpenFreeMap, which sees the area on screen and your internet address,
+            but never your entries.
+          </span>
+        </span>
+      </label>
     </section>
   );
 }

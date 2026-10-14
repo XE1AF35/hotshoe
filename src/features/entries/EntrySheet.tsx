@@ -1,4 +1,6 @@
 import { type FormEvent, useId, useState } from 'react';
+import { MapIcon } from '../../app/icons.tsx';
+import { detailHref } from '../../app/router.ts';
 import { Sheet } from '../../app/Sheet.tsx';
 import { useDb } from '../../db/DbProvider.tsx';
 import { type DeletedEntry, deleteEntry, updateEntry } from '../../db/entries.ts';
@@ -88,7 +90,16 @@ function EntryForm({
           {entry.altitudeM !== null && ` · ${Math.round(entry.altitudeM)} m altitude`}
         </p>
       </div>
-      <CopyCoordsButton coords={entry} format={coordFormat} />
+      <div className="grid grid-cols-[1fr_auto] items-start gap-2">
+        <CopyCoordsButton coords={entry} format={coordFormat} />
+        <a
+          href={detailHref('map', entry.id)}
+          className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line bg-raised px-4 font-medium"
+        >
+          <MapIcon className="size-5" />
+          Show on map
+        </a>
+      </div>
 
       <div className="space-y-1">
         <label htmlFor={ids.label} className="block font-medium text-sm">

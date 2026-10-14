@@ -11,18 +11,23 @@ const base = process.env.BASE_PATH ?? '/hotshoe/';
 // The dark background, also used for the status bar and splash screen when installed.
 const dark = '#0c0a09';
 
+// Map styles, tiles, sprites, and fonts all come from here (src/features/map/mapConfig.ts).
+const mapTileHost = 'https://tiles.openfreemap.org';
+
 // GitHub Pages cannot send response headers, so the policy ships as a meta tag.
-// Directives are added as features need them (map tiles, workers).
+// Directives are added as features need them.
 const contentSecurityPolicy = [
   "default-src 'self'",
   "script-src 'self'",
+  // MapLibre's worker, served from this origin.
+  "worker-src 'self'",
   "style-src 'self'",
   // WebKit sets an inline style attribute on <select> when its value changes, and reports a
   // violation without this. Style attributes cannot run script or select elements, and any url()
   // in one is still limited by img-src; <style> elements stay blocked by style-src above.
   "style-src-attr 'unsafe-inline'",
   "img-src 'self' data: blob:",
-  "connect-src 'self'",
+  `connect-src 'self' ${mapTileHost}`,
   "object-src 'none'",
   "base-uri 'none'",
   "form-action 'none'",
@@ -45,6 +50,10 @@ function contentSecurityPolicyMeta(): Plugin {
 
 export default defineConfig({
   base,
+  build: {
+    // MapLibre is about 1 MB on its own. It loads only when the Map tab opens.
+    chunkSizeWarningLimit: 1100,
+  },
   plugins: [
     react(),
     tailwindcss(),
@@ -84,9 +93,44 @@ export default defineConfig({
       workbox: {
         // Prefixes every cache name, so caches never clash with other apps on the same origin.
         cacheId: 'hotshoe',
-        // Everything is precached so the whole app works offline after the first visit.
-        globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
+        // Everything is precached so the whole app works offline after the first visit. That
+        // includes the map's code (.mjs is MapLibre's worker), though not its tiles.
+        globPatterns: ['**/*.{js,mjs,css,html,svg,png,ico}'],
+        // MapLibre's main chunk is just over Workbox's 2 MB default.
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         cleanupOutdatedCaches: true,
+        runtimeCaching: [
+          {
+            // Map tiles: kept once seen, so areas already viewed still show offline. The tile
+            // URLs carry a version, so a cached tile never goes stale, only out of date.
+            // Workbox copies these functions into the service worker as text, so the host is
+            // written out rather than read from mapTileHost.
+            urlPattern: ({ url }) =>
+              url.origin === 'https://tiles.openfreemap.org' &&
+              (url.pathname.startsWith('/planet/') || url.pathname.startsWith('/natural_earth/')),
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'map-tiles',
+              expiration: {
+                maxEntries: 3000,
+                maxAgeSeconds: 30 * 24 * 60 * 60,
+                purgeOnQuotaError: true,
+              },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          {
+            // The style, sprites, fonts, and tile index: used straight from the cache, then
+            // refreshed in the background.
+            urlPattern: ({ url }) => url.origin === 'https://tiles.openfreemap.org',
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'map-style',
+              expiration: { maxEntries: 200, purgeOnQuotaError: true },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+        ],
       },
     }),
     contentSecurityPolicyMeta(),

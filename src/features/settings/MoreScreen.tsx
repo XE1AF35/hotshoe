@@ -17,8 +17,13 @@ export function MoreScreen() {
           About
         </h2>
         <p className="text-muted">
-          Hotshoe keeps everything on this iPhone. Nothing is sent anywhere, and there is no
-          account.
+          Hotshoe keeps everything on this iPhone, and there is no account. Your entries are never
+          sent anywhere. The one exception is the map: to draw it, Hotshoe asks OpenFreeMap for the
+          area you're looking at, so OpenFreeMap can see that area but not your entries.
+        </p>
+        <p className="text-muted">
+          Map data © OpenStreetMap contributors, served by OpenFreeMap. Hotshoe is open source under
+          the MIT licence.
         </p>
       </section>
     </section>
