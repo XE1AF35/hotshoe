@@ -17,6 +17,13 @@ test.describe('with location allowed', () => {
 
     await page.getByLabel('Label').fill('Ferry terminal');
     await page.getByLabel('Label').press('Enter');
+    // Saving happens after Return, so wait until the label is stored before reloading.
+    await page
+      .getByRole('navigation', { name: 'Main' })
+      .getByRole('link', { name: 'Entries' })
+      .click();
+    await expect(page.getByRole('button', { name: /Ferry terminal/ })).toBeVisible();
+    await page.getByRole('navigation', { name: 'Main' }).getByRole('link', { name: 'Log' }).click();
 
     await page.reload();
     await expect(page.getByRole('heading', { name: 'Last logged' })).toBeVisible();
