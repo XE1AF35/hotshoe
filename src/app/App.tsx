@@ -22,7 +22,7 @@ export function App() {
   return (
     <div className="flex min-h-dvh flex-col">
       <InstallBanner />
-      <main className="mx-auto w-full max-w-xl flex-1 px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-6">
+      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-6">
         <Screen />
       </main>
       <TabBar current={tab} />
