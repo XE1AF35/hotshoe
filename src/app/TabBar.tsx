@@ -17,7 +17,7 @@ export function TabBar({ current }: { readonly current: Tab }) {
   return (
     <nav
       aria-label="Main"
-      className="sticky bottom-0 z-10 border-line border-t bg-raised/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+      className="border-line border-t bg-raised pb-[env(safe-area-inset-bottom)]"
     >
       <ul className="mx-auto flex max-w-xl">
         {items.map(({ tab, label, Icon }) => {
