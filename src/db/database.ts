@@ -23,5 +23,10 @@ export class HotshoeDb extends Dexie {
       photos: 'id, entryId, [entryId+takenAt]',
       meta: 'key',
     });
+    // Indexes photo sizes, so the storage readout can add them up without reading any images.
+    // Only an index is added, which IndexedDB builds itself, so no upgrade function is needed.
+    this.version(2).stores({
+      photos: 'id, entryId, [entryId+takenAt], bytes',
+    });
   }
 }

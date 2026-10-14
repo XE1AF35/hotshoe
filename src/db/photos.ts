@@ -38,13 +38,20 @@ export async function deletePhoto(db: HotshoeDb, id: PhotoId): Promise<void> {
   await db.photos.delete(id);
 }
 
+/** The thumbnail of an entry's first photo, for list rows, or null when it has none. */
+export async function firstThumb(db: HotshoeDb, entryId: EntryId): Promise<Blob | null> {
+  const first = await db.photos
+    .where('[entryId+takenAt]')
+    .between([entryId, Dexie.minKey], [entryId, Dexie.maxKey])
+    .first();
+  return first ? new Blob([first.thumb], { type: 'image/jpeg' }) : null;
+}
+
 /** Bytes used by all photos, for the storage readout. */
 export async function totalPhotoBytes(db: HotshoeDb): Promise<number> {
-  let total = 0;
-  await db.photos.each((photo) => {
-    total += photo.bytes;
-  });
-  return total;
+  // Index keys only: reading the photos themselves would load every image.
+  const sizes = (await db.photos.orderBy('bytes').keys()) as number[];
+  return sizes.reduce((total, bytes) => total + bytes, 0);
 }
 
 async function toStored(photo: Photo): Promise<StoredPhoto> {
