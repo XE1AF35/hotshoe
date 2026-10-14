@@ -8,6 +8,7 @@ import type { Settings } from '../../db/settings.ts';
 import { formatAccuracy } from '../../lib/format.ts';
 import { attachPhotos, attachProblemMessage } from '../photos/attach.ts';
 import { usePhotoInputs } from '../photos/usePhotoInputs.tsx';
+import { BackupReminder } from '../transfer/BackupReminder.tsx';
 import { ActiveTripPicker } from '../trips/ActiveTripPicker.tsx';
 import { CaptureProblem } from './CaptureProblem.tsx';
 import type { CaptureState } from './capture.ts';
@@ -69,6 +70,7 @@ function LogScreenBody({
   return (
     <>
       <ActiveTripPicker activeTripId={settings.activeTripId} />
+      <BackupReminder settings={settings} />
       {state.status === 'failed' && <CaptureProblem reason={state.reason} />}
       {pendingPhotos.length > 0 && state.status !== 'locating' && state.status !== 'saving' && (
         <p role="status" className="rounded-2xl bg-warning p-4 text-on-warning text-sm">
