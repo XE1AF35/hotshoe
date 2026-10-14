@@ -45,6 +45,8 @@ test('exports only the entries ticked in Select mode', async ({ page, context })
     await context.setGeolocation({ ...wharf, latitude: wharf.latitude + index / 1000 });
     await page.getByRole('button', { name: 'Log location' }).click();
     await expect(page.getByRole('heading', { name: 'Logged' })).toBeVisible();
+    // The previous entry's card shows until the new one is saved, so wait for an empty label.
+    await expect(page.getByLabel('Label')).toHaveValue('');
     await page.getByLabel('Label').fill(label);
     await page.getByLabel('Label').press('Enter');
     await expect(page.getByLabel('Label')).toHaveValue(label);
