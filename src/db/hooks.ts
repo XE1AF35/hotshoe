@@ -1,7 +1,7 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useDb } from './DbProvider.tsx';
 import { listEntries } from './entries.ts';
-import { listPhotos } from './photos.ts';
+import { listPhotos, totalPhotoBytes } from './photos.ts';
 import type { Entry, EntryId, Photo, Trip, TripId } from './schema.ts';
 import { getSetting, getSettings, type Settings } from './settings.ts';
 import { listTrips } from './trips.ts';
@@ -76,5 +76,20 @@ export function useBackupStatus():
       db.entries.where('updatedAt').above(since).first(),
     ]);
     return { lastBackupAt, changed, oldestChangeAt: oldest?.updatedAt ?? null };
+  }, [db]);
+}
+
+/** How much Hotshoe holds, for the storage readout. Undefined while loading. */
+export function useStoredCounts():
+  | { entries: number; photos: number; photoBytes: number }
+  | undefined {
+  const db = useDb();
+  return useLiveQuery(async () => {
+    const [entries, photos, photoBytes] = await Promise.all([
+      db.entries.count(),
+      db.photos.count(),
+      totalPhotoBytes(db),
+    ]);
+    return { entries, photos, photoBytes };
   }, [db]);
 }

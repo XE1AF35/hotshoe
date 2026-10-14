@@ -12,11 +12,19 @@ import { type CoordFormat, formatCoords } from '../../lib/coords.ts';
 const example = { lat: -36.848461, lon: 174.763336 };
 const accuracyChoices = [10, 20, 30, 50, 100] as const;
 const timeoutChoices = [30, 45, 60, 90, 120] as const;
+const reminderDayChoices = [3, 7, 14, 30] as const;
+const reminderEntryChoices = [10, 25, 50, 100] as const;
 
 export function SettingsSection() {
   const db = useDb();
   const settings = useSettings();
-  const ids = { accuracy: useId(), timeout: useId(), map: useId() };
+  const ids = {
+    accuracy: useId(),
+    timeout: useId(),
+    reminderDays: useId(),
+    reminderEntries: useId(),
+    map: useId(),
+  };
   if (!settings) return null;
 
   function save<K extends SettingKey>(key: K, value: Settings[K]) {
@@ -115,6 +123,46 @@ export function SettingsSection() {
           </select>
         </div>
       </div>
+
+      <fieldset className="space-y-1">
+        <legend className="mb-1 font-medium text-sm">Remind me to back up</legend>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <label htmlFor={ids.reminderDays} className="block text-muted text-sm">
+              After
+            </label>
+            <select
+              id={ids.reminderDays}
+              value={settings.backupReminderDays}
+              onChange={(event) => save('backupReminderDays', Number(event.target.value))}
+              className="min-h-12 w-full rounded-xl border border-line bg-raised px-3 text-base"
+            >
+              {reminderDayChoices.map((days) => (
+                <option key={days} value={days}>
+                  {days} days
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label htmlFor={ids.reminderEntries} className="block text-muted text-sm">
+              Or after
+            </label>
+            <select
+              id={ids.reminderEntries}
+              value={settings.backupReminderEntries}
+              onChange={(event) => save('backupReminderEntries', Number(event.target.value))}
+              className="min-h-12 w-full rounded-xl border border-line bg-raised px-3 text-base"
+            >
+              {reminderEntryChoices.map((entries) => (
+                <option key={entries} value={entries}>
+                  {entries} entries
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      </fieldset>
 
       <label htmlFor={ids.map} className="flex min-h-12 items-start gap-3 px-3">
         <input

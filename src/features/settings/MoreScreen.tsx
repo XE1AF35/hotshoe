@@ -3,6 +3,7 @@ import { BackupSection } from '../transfer/BackupSection.tsx';
 import { ExportSection } from '../transfer/ExportSection.tsx';
 import { TripsSection } from '../trips/TripsSection.tsx';
 import { SettingsSection } from './SettingsSection.tsx';
+import { StorageSection } from './StorageSection.tsx';
 
 export function MoreScreen() {
   return (
@@ -12,6 +13,7 @@ export function MoreScreen() {
       <ExportSection />
       <TripsSection />
       <SettingsSection />
+      <StorageSection />
       <section aria-labelledby="about-heading" className="space-y-2 text-sm">
         <h2 id="about-heading" className="font-semibold text-lg">
           About
