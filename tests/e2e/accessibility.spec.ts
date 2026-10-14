@@ -16,7 +16,7 @@ async function expectNoViolations(page: Page, state: string) {
 async function overflowingElements(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const width = document.documentElement.clientWidth;
-    return [...document.querySelectorAll('main *, nav *')]
+    return [...document.querySelectorAll('main *, nav *, dialog *')]
       .filter((element) => {
         const box = element.getBoundingClientRect();
         return box.width > 0 && (box.right > width + 1 || box.left < -1);
@@ -94,6 +94,10 @@ test('fits the screen without sideways scrolling at 200% text size', async ({ pa
     problems[tab] = await overflowingElements(page);
   }
   await nav.getByRole('link', { name: 'Entries' }).click();
+  await page.getByRole('button', { name: /ferry terminal/ }).click();
+  await expect(page.getByRole('dialog', { name: 'Entry' })).toBeVisible();
+  problems['entry sheet'] = await overflowingElements(page);
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Select' }).click();
   problems['select mode'] = await overflowingElements(page);
 
@@ -103,6 +107,7 @@ test('fits the screen without sideways scrolling at 200% text size', async ({ pa
     Entries: [],
     Map: [],
     More: [],
+    'entry sheet': [],
     'select mode': [],
   });
 });

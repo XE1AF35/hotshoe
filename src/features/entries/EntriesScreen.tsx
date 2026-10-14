@@ -148,8 +148,9 @@ function EntryRow({
   /** In select mode the row ticks a checkbox instead of opening the entry. */
   readonly selection: { readonly checked: boolean; readonly onToggle: () => void } | null;
 }) {
+  // Wraps at the largest text sizes, so the time sits above the label instead of off-screen.
   const className =
-    'flex min-h-16 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface';
+    'flex min-h-16 w-full flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2.5 text-left active:bg-surface';
   if (selection) {
     return (
       <label className={`${className} has-checked:bg-surface`}>
@@ -181,14 +182,14 @@ function EntryRowContent({
 }) {
   return (
     <>
-      <span className="w-18 shrink-0 font-mono text-sm tabular-nums">
+      <span className="min-w-18 shrink-0 font-mono text-sm tabular-nums">
         {formatLoggedClock(entry.loggedAt, entry)}
       </span>
-      <span className="min-w-0 flex-1 space-y-1">
+      <span className="min-w-0 flex-1 basis-32 space-y-1">
         <span className={`block truncate font-medium ${entry.label === null ? 'text-muted' : ''}`}>
           {entry.label ?? 'Untitled'}
         </span>
-        <span className="flex items-center gap-2 text-muted text-sm">
+        <span className="flex flex-wrap items-center gap-2 text-muted text-sm">
           <AccuracyPill accuracyM={entry.accuracyM} targetM={accuracyTargetM} />
           {entry.frame !== null && <span>Frame {entry.frame}</span>}
         </span>

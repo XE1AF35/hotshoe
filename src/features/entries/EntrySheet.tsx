@@ -90,13 +90,16 @@ function EntryForm({
           {entry.altitudeM !== null && ` · ${Math.round(entry.altitudeM)} m altitude`}
         </p>
       </div>
-      <div className="grid grid-cols-[1fr_auto] items-start gap-2">
-        <CopyCoordsButton coords={entry} format={coordFormat} />
+      <div className="flex flex-wrap items-start gap-2">
+        {/* Side by side when both labels fit on one line, otherwise stacked full width. */}
+        <div className="min-w-0 grow basis-52">
+          <CopyCoordsButton coords={entry} format={coordFormat} />
+        </div>
         <a
           href={detailHref('map', entry.id)}
-          className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-line bg-raised px-4 font-medium"
+          className="flex min-h-12 grow basis-40 items-center justify-center gap-2 rounded-xl border border-line bg-raised px-4 font-medium"
         >
-          <MapIcon className="size-5" />
+          <MapIcon className="size-5 shrink-0" />
           Show on map
         </a>
       </div>
@@ -114,8 +117,8 @@ function EntryForm({
           className="min-h-12 w-full rounded-xl border border-line bg-raised px-3 text-base"
         />
       </div>
-      <div className="grid grid-cols-[7rem_1fr] gap-3">
-        <div className="space-y-1">
+      <div className="flex flex-wrap gap-3">
+        <div className="min-w-0 basis-28 space-y-1">
           <label htmlFor={ids.frame} className="block font-medium text-sm">
             Frame
           </label>
@@ -128,7 +131,7 @@ function EntryForm({
             className="min-h-12 w-full rounded-xl border border-line bg-raised px-3 text-base"
           />
         </div>
-        <div className="space-y-1">
+        <div className="min-w-0 grow basis-40 space-y-1">
           <label htmlFor={ids.trip} className="block font-medium text-sm">
             Trip
           </label>

@@ -27,8 +27,8 @@ export function SelectionBar({
   const count = picked.size;
 
   return (
-    <div className="sticky bottom-0 z-10 -mx-4 space-y-2 border-line border-t bg-surface px-4 py-3">
-      <div className="flex items-center justify-between gap-3">
+    <div className="sticky bottom-3 z-10 space-y-2 rounded-2xl bg-raised p-3 shadow-lg ring-1 ring-line">
+      <div className="flex flex-wrap items-center justify-between gap-x-3">
         <p role="status" className="font-medium">
           {count} selected
         </p>
@@ -49,7 +49,7 @@ export function SelectionBar({
           id={formatId}
           value={format}
           onChange={(event) => setFormat(event.target.value as ExportFormat)}
-          className="min-h-12 shrink-0 rounded-xl border border-line bg-raised px-3 text-base"
+          className="min-h-12 max-w-full rounded-xl border border-line bg-surface px-3 text-base"
         >
           {exportFormats.map(({ value, title }) => (
             <option key={value} value={value}>
@@ -61,10 +61,10 @@ export function SelectionBar({
           type="button"
           onClick={() => void share()}
           disabled={count === 0 || ready === null}
-          className="flex min-h-12 min-w-max flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-4 font-semibold text-on-accent disabled:opacity-60"
+          className="flex min-h-12 min-w-0 grow basis-40 items-center justify-center gap-2 rounded-xl bg-accent px-4 py-2 text-center font-semibold text-on-accent disabled:opacity-60"
         >
-          <ShareIcon className="size-5" />
-          Export selected
+          <ShareIcon className="size-5 shrink-0" />
+          <span className="min-w-0">Export selected</span>
         </button>
       </div>
       {message && (

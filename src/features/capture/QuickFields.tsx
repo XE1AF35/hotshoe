@@ -11,11 +11,13 @@ type Field = 'label' | 'frame';
  */
 export function QuickFields({ entry }: { readonly entry: Entry }) {
   return (
-    <div className="grid grid-cols-[1fr_7rem] gap-3">
+    // Side by side, or stacked when large text leaves no room for both.
+    <div className="flex flex-wrap gap-3">
       <QuickField
         key={`label-${entry.id}`}
         entry={entry}
         field="label"
+        className="min-w-0 grow basis-48"
         label="Label"
         placeholder="e.g. Wharf at dusk"
         maxLength={limits.labelLength}
@@ -24,6 +26,7 @@ export function QuickFields({ entry }: { readonly entry: Entry }) {
         key={`frame-${entry.id}`}
         entry={entry}
         field="frame"
+        className="min-w-0 basis-28"
         label="Frame"
         placeholder="e.g. 12"
         maxLength={limits.frameLength}
@@ -35,12 +38,14 @@ export function QuickFields({ entry }: { readonly entry: Entry }) {
 function QuickField({
   entry,
   field,
+  className,
   label,
   placeholder,
   maxLength,
 }: {
   readonly entry: Entry;
   readonly field: Field;
+  readonly className: string;
   readonly label: string;
   readonly placeholder: string;
   readonly maxLength: number;
@@ -62,7 +67,7 @@ function QuickField({
   }
 
   return (
-    <div className="space-y-1">
+    <div className={`space-y-1 ${className}`}>
       <label htmlFor={id} className="block font-medium text-sm">
         {label}
       </label>

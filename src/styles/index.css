@@ -67,8 +67,15 @@
 
   body {
     @apply bg-surface text-ink antialiased;
+    /* At the largest text sizes a long word or coordinate may be wider than the screen. */
+    overflow-wrap: anywhere;
     /* No grey flash when tapping links and buttons on iOS. */
     -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Fieldsets are otherwise as wide as their widest line, which overflows at large text sizes. */
+  fieldset {
+    min-inline-size: 0;
   }
 
   /* Animations use Tailwind's motion-safe: variant, so reduced motion needs no override here. */
