@@ -8,7 +8,7 @@ const budgetBytes = 120 * 1024;
 const distDir = 'dist';
 
 const html = await readFile(join(distDir, 'index.html'), 'utf8');
-const base = '/hotshoe/';
+const base = process.env.BASE_PATH ?? '/hotshoe/';
 const scriptPaths = [
   ...html.matchAll(/<script[^>]+src="([^"]+\.js)"/g),
   ...html.matchAll(/<link[^>]+rel="modulepreload"[^>]+href="([^"]+\.js)"/g),

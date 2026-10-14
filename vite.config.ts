@@ -3,8 +3,9 @@ import react from '@vitejs/plugin-react';
 import type { Plugin } from 'vite';
 import { defineConfig } from 'vitest/config';
 
-// Served from https://<user>.github.io/hotshoe/ on GitHub Pages.
-const base = '/hotshoe/';
+// GitHub Pages serves the app from /hotshoe/. BASE_PATH lets another host or a custom domain use
+// its own path, so moving hosts is a config change.
+const base = process.env.BASE_PATH ?? '/hotshoe/';
 
 // GitHub Pages cannot send response headers, so the policy ships as a meta tag.
 // Directives are added as features need them (map tiles, workers).

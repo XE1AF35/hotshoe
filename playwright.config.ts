@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const port = 4173;
 const isCi = Boolean(process.env.CI);
+const base = process.env.BASE_PATH ?? '/hotshoe/';
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -10,7 +11,7 @@ export default defineConfig({
   retries: isCi ? 1 : 0,
   reporter: isCi ? [['github'], ['html', { open: 'never' }]] : 'list',
   use: {
-    baseURL: `http://localhost:${port}/hotshoe/`,
+    baseURL: `http://localhost:${port}${base}`,
     trace: 'on-first-retry',
   },
   projects: [
@@ -29,7 +30,7 @@ export default defineConfig({
   webServer: {
     // Test the production build so the Content Security Policy is in force.
     command: `pnpm build && pnpm preview --port ${port} --strictPort`,
-    url: `http://localhost:${port}/hotshoe/`,
+    url: `http://localhost:${port}${base}`,
     reuseExistingServer: !isCi,
   },
 });
