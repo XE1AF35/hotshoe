@@ -1,4 +1,3 @@
-import 'fake-indexeddb/auto';
 import { afterEach } from 'vitest';
 import { HotshoeDb } from '../db/database.ts';
 import type { NewEntry } from '../db/entries.ts';

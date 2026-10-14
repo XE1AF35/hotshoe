@@ -97,7 +97,12 @@ export default defineConfig({
       {
         // Logic and database tests. Node's Blob survives IndexedDB's structured clone.
         extends: true,
-        test: { name: 'unit', include: ['src/**/*.test.ts'], environment: 'node' },
+        test: {
+          name: 'unit',
+          include: ['src/**/*.test.ts'],
+          environment: 'node',
+          setupFiles: ['src/test/setup-indexeddb.ts'],
+        },
       },
       {
         // Component tests.
@@ -106,7 +111,7 @@ export default defineConfig({
           name: 'dom',
           include: ['src/**/*.test.tsx'],
           environment: 'happy-dom',
-          setupFiles: ['src/test/setup-dom.ts'],
+          setupFiles: ['src/test/setup-indexeddb.ts', 'src/test/setup-dom.ts'],
         },
       },
     ],
