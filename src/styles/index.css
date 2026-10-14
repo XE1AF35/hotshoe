@@ -34,7 +34,7 @@
   --danger-ink: #b91c1c;
   /* A fix within the accuracy target. */
   --good: #22c55e;
-  --good-ink: #15803d;
+  --good-ink: #166534;
 }
 
 @media (prefers-color-scheme: dark) {
