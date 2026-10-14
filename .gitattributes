@@ -1,0 +1,2 @@
+# Golden export files must keep their exact bytes, CRLF line endings included.
+src/features/transfer/golden/** -text

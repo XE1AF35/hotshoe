@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Hotshoe" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata><time>2026-10-14T03:12:45Z</time></metadata>
+  <wpt lat="-36.848461" lon="174.763336"><ele>12.5</ele><time>2026-10-14T01:00:00Z</time><name>Ōtaki wharf (frame 12A)</name></wpt>
+  <wpt lat="-36.848461" lon="174.763336"><ele>12.5</ele><time>2026-10-14T02:00:00Z</time><name>=HYPERLINK(&quot;http://example.com&quot;) (frame -3)</name></wpt>
+  <wpt lat="-36.800000" lon="175.100000"><time>2026-10-14T11:30:00Z</time><name>Onetangi, &quot;golden hour&quot;
+second line</name></wpt>
+  <trk>
+    <name>Waiheke &amp; &lt;Rakino&gt;</name>
+    <trkseg>
+      <trkpt lat="-36.848461" lon="174.763336"><ele>12.5</ele><time>2026-10-14T01:00:00Z</time></trkpt>
+    </trkseg>
+    <trkseg>
+      <trkpt lat="-36.800000" lon="175.100000"><time>2026-10-14T11:30:00Z</time></trkpt>
+    </trkseg>
+  </trk>
+  <trk>
+    <name>No trip</name>
+    <trkseg>
+      <trkpt lat="-36.848461" lon="174.763336"><ele>12.5</ele><time>2026-10-14T02:00:00Z</time></trkpt>
+    </trkseg>
+  </trk>
+</gpx>

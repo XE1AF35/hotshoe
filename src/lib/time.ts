@@ -50,3 +50,27 @@ export function localDayKey(epochMs: number, context: TimeContext): DayKey {
   const shifted = new Date(epochMs + context.utcOffsetMin * 60_000);
   return shifted.toISOString().slice(0, 10) as DayKey;
 }
+
+/**
+ * An instant as local time with its UTC offset, as recorded when it was logged:
+ * `2026-10-14T16:12:45+13:00`. Whole seconds, like the times photo software reads.
+ */
+export function formatLocalIso(epochMs: number, utcOffsetMin: number): string {
+  const local = new Date(epochMs + utcOffsetMin * 60_000).toISOString().slice(0, 19);
+  const sign = utcOffsetMin < 0 ? '-' : '+';
+  const hours = String(Math.floor(Math.abs(utcOffsetMin) / 60)).padStart(2, '0');
+  const minutes = String(Math.abs(utcOffsetMin) % 60).padStart(2, '0');
+  return `${local}${sign}${hours}:${minutes}`;
+}
+
+/** An instant in UTC to whole seconds: `2026-10-14T03:12:45Z`. */
+export function formatUtcIso(epochMs: number): string {
+  return `${new Date(epochMs).toISOString().slice(0, 19)}Z`;
+}
+
+/** Today's date on this device for file names: `20261014`. */
+export function fileDateStamp(epochMs: number): string {
+  const date = new Date(epochMs);
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`;
+}

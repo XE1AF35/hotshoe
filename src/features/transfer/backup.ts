@@ -10,6 +10,7 @@ import type { HotshoeDb } from '../../db/database.ts';
 import { withStorageErrors } from '../../db/errors.ts';
 import type { PhotoId, StoredPhoto } from '../../db/schema.ts';
 import { getSetting, setSetting } from '../../db/settings.ts';
+import { fileDateStamp } from '../../lib/time.ts';
 import { type BackupJson, backupJsonSchema } from './backupSchema.ts';
 
 /** A problem with a backup file, worded for the person restoring it. */
@@ -79,7 +80,9 @@ export async function createBackup(
   const zipped = zipSync(files, { mtime: now });
 
   return {
-    file: new File([zipped], `hotshoe-backup-${localDate(now)}.zip`, { type: 'application/zip' }),
+    file: new File([zipped], `hotshoe-backup-${fileDateStamp(now)}.zip`, {
+      type: 'application/zip',
+    }),
     entries: entries.length,
     photos: photos.length,
   };
@@ -264,10 +267,4 @@ function parseJson(bytes: Uint8Array): BackupJson {
 
 function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
   return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-}
-
-function localDate(epochMs: number): string {
-  const date = new Date(epochMs);
-  const pad = (value: number) => String(value).padStart(2, '0');
-  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}`;
 }

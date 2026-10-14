@@ -27,6 +27,11 @@ export function formatDms({ lat, lon }: LatLon): string {
   return `${dmsPart(lat, 'N', 'S')}, ${dmsPart(lon, 'E', 'W')}`;
 }
 
+/** One coordinate to six decimal places, as exports write it: `-36.848461`. */
+export function formatDegrees(value: number): string {
+  return fixedWithoutNegativeZero(value, decimalPlaces);
+}
+
 export function formatCoords(coords: LatLon, format: CoordFormat): string {
   return format === 'dms' ? formatDms(coords) : formatDecimal(coords);
 }

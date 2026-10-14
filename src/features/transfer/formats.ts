@@ -1,0 +1,214 @@
+/**
+ * CSV, GeoJSON, and GPX exports, as pure functions of the entries so each format can be checked
+ * against a golden file. Every format uses the time the button was tapped (`loggedAt`), lists
+ * entries oldest first, and rounds coordinates to six decimal places.
+ */
+
+import type { Entry, PhotoId } from '../../db/schema.ts';
+import { formatDegrees } from '../../lib/coords.ts';
+import { formatLocalIso, formatUtcIso, localDayKey } from '../../lib/time.ts';
+
+export type ExportFormat = 'csv' | 'geojson' | 'gpx';
+
+/** An entry with the details exports need from other tables. */
+export interface ExportRow {
+  readonly entry: Entry;
+  /** null when the entry has no trip. */
+  readonly tripName: string | null;
+  readonly photoIds: readonly PhotoId[];
+}
+
+export const formatDetails: Record<ExportFormat, { extension: string; mimeType: string }> = {
+  csv: { extension: 'csv', mimeType: 'text/csv' },
+  geojson: { extension: 'geojson', mimeType: 'application/geo+json' },
+  gpx: { extension: 'gpx', mimeType: 'application/gpx+xml' },
+};
+
+export function formatExport(
+  format: ExportFormat,
+  rows: readonly ExportRow[],
+  now: number,
+): string {
+  const sorted = [...rows].sort((a, b) => a.entry.loggedAt - b.entry.loggedAt);
+  switch (format) {
+    case 'csv':
+      return toCsv(sorted);
+    case 'geojson':
+      return toGeoJson(sorted);
+    case 'gpx':
+      return toGpx(sorted, now);
+  }
+}
+
+/** The names photos have inside a backup zip, so an export row can be matched to its photos. */
+function photoFileNames(row: ExportRow): string[] {
+  return row.photoIds.map((id) => `${id}.jpg`);
+}
+
+/** Metres to one decimal place; finer than that is noise. */
+function metres(value: number): number {
+  return Math.round(value * 10) / 10;
+}
+
+// CSV (RFC 4180, UTF-8)
+
+const csvColumns = [
+  'id',
+  'logged_at_utc',
+  'logged_at_local',
+  'time_zone',
+  'latitude',
+  'longitude',
+  'accuracy_m',
+  'altitude_m',
+  'label',
+  'frame',
+  'trip',
+  'photos',
+] as const;
+
+function toCsv(rows: readonly ExportRow[]): string {
+  const lines = [csvColumns.join(',')];
+  for (const row of rows) {
+    const { entry } = row;
+    lines.push(
+      [
+        entry.id,
+        formatUtcIso(entry.loggedAt),
+        formatLocalIso(entry.loggedAt, entry.utcOffsetMin),
+        entry.timeZone,
+        formatDegrees(entry.lat),
+        formatDegrees(entry.lon),
+        String(metres(entry.accuracyM)),
+        entry.altitudeM === null ? '' : String(metres(entry.altitudeM)),
+        textCell(entry.label),
+        textCell(entry.frame),
+        textCell(row.tripName),
+        photoFileNames(row).join(' '),
+      ]
+        .map(csvField)
+        .join(','),
+    );
+  }
+  // The byte order mark tells Excel the file is UTF-8, so names like Ōtaki come through intact.
+  return `﻿${lines.join('\r\n')}\r\n`;
+}
+
+/**
+ * Text someone typed. A leading `=`, `+`, `-`, `@`, tab, or carriage return would make a
+ * spreadsheet treat the cell as a formula, so it gets a `'` in front (OWASP CSV injection).
+ */
+function textCell(value: string | null): string {
+  if (value === null) return '';
+  return /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+}
+
+function csvField(value: string): string {
+  return /[",\r\n]/.test(value) ? `"${value.replaceAll('"', '""')}"` : value;
+}
+
+// GeoJSON (RFC 7946)
+
+function toGeoJson(rows: readonly ExportRow[]): string {
+  const features = rows.map((row) => {
+    const { entry } = row;
+    return {
+      type: 'Feature',
+      // RFC 7946 puts longitude first.
+      geometry: {
+        type: 'Point',
+        coordinates: [Number(formatDegrees(entry.lon)), Number(formatDegrees(entry.lat))],
+      },
+      properties: {
+        id: entry.id,
+        logged_at_utc: formatUtcIso(entry.loggedAt),
+        logged_at_local: formatLocalIso(entry.loggedAt, entry.utcOffsetMin),
+        time_zone: entry.timeZone,
+        accuracy_m: metres(entry.accuracyM),
+        altitude_m: entry.altitudeM === null ? null : metres(entry.altitudeM),
+        label: entry.label,
+        frame: entry.frame,
+        trip: row.tripName,
+        photos: photoFileNames(row),
+      },
+    };
+  });
+  return `${JSON.stringify({ type: 'FeatureCollection', features }, null, 2)}\n`;
+}
+
+// GPX 1.1
+
+/**
+ * One track per trip and one segment per local day, so photo software doesn't draw a line, and
+ * guess positions, between days. Every point is also a waypoint, for apps that only show those.
+ */
+function toGpx(rows: readonly ExportRow[], now: number): string {
+  const trips = new Map<string | null, ExportRow[]>();
+  for (const row of rows) {
+    const group = trips.get(row.tripName);
+    if (group) group.push(row);
+    else trips.set(row.tripName, [row]);
+  }
+
+  const lines = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<gpx version="1.1" creator="Hotshoe" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">',
+    `  <metadata><time>${formatUtcIso(now)}</time></metadata>`,
+  ];
+
+  for (const row of rows) {
+    const name = waypointName(row.entry);
+    lines.push(
+      `  <wpt ${gpxPosition(row.entry)}>${gpxPointBody(row.entry)}${name === null ? '' : `<name>${xml(name)}</name>`}</wpt>`,
+    );
+  }
+
+  for (const [tripName, tripRows] of trips) {
+    lines.push('  <trk>', `    <name>${xml(tripName ?? 'No trip')}</name>`);
+    let day: string | null = null;
+    for (const { entry } of tripRows) {
+      const entryDay = localDayKey(entry.loggedAt, entry);
+      if (entryDay !== day) {
+        if (day !== null) lines.push('    </trkseg>');
+        lines.push('    <trkseg>');
+        day = entryDay;
+      }
+      lines.push(`      <trkpt ${gpxPosition(entry)}>${gpxPointBody(entry)}</trkpt>`);
+    }
+    lines.push('    </trkseg>', '  </trk>');
+  }
+
+  lines.push('</gpx>');
+  return `${lines.join('\n')}\n`;
+}
+
+function gpxPosition(entry: Entry): string {
+  return `lat="${formatDegrees(entry.lat)}" lon="${formatDegrees(entry.lon)}"`;
+}
+
+/** `<ele>` when the altitude is known, then `<time>`, in the order the GPX schema requires. */
+function gpxPointBody(entry: Entry): string {
+  const ele = entry.altitudeM === null ? '' : `<ele>${metres(entry.altitudeM)}</ele>`;
+  return `${ele}<time>${formatUtcIso(entry.loggedAt)}</time>`;
+}
+
+function waypointName(entry: Entry): string | null {
+  if (entry.label !== null && entry.frame !== null) return `${entry.label} (frame ${entry.frame})`;
+  if (entry.label !== null) return entry.label;
+  if (entry.frame !== null) return `Frame ${entry.frame}`;
+  return null;
+}
+
+function xml(text: string): string {
+  return (
+    text
+      // Control characters other than tab and newlines aren't allowed anywhere in XML 1.0.
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: matching them is the point.
+      .replaceAll(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&apos;')
+  );
+}
