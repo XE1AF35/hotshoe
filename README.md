@@ -2,7 +2,7 @@
 
 Log where you took a photo, so you can geotag it later.
 
-Hotshoe is a small web app for iPhone, installed to the Home Screen from Safari. Tap one button when you take a photo and it records your location, accuracy, and time. You can attach a quick reference photo from the iPhone camera, then copy the coordinates into Flickr's location editor or export a GPX track for digiKam, Lightroom, or darktable.
+Hotshoe is a small web app for iPhone, installed to the Home Screen from Safari. Tap one button when you take a photo and it records your location, accuracy, and time. You can attach a quick reference photo from the iPhone camera, then copy the coordinates into any photo site or map app, or export a GPX track for digiKam, Lightroom, or darktable.
 
 Everything stays on your phone. There is no account, no server, and no tracking.
 

@@ -89,7 +89,7 @@ function LogScreenBody({
       ) : (
         <p className="text-muted">
           Tap the button each time you take a photo. Hotshoe records where you are, ready to copy
-          into Flickr or export for your photo software later.
+          into a photo site or export for your photo software later.
         </p>
       )}
 

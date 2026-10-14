@@ -3,7 +3,7 @@ import { CheckIcon, CopyIcon } from '../../app/icons.tsx';
 import { copyText } from '../../lib/clipboard.ts';
 import { type CoordFormat, formatCoords, type LatLon } from '../../lib/coords.ts';
 
-/** One tap copies the coordinates in the format Flickr's location editor accepts. */
+/** One tap copies the coordinates, ready to paste into a photo site, map app, or editor. */
 export function CopyCoordsButton({
   coords,
   format,
@@ -28,7 +28,7 @@ export function CopyCoordsButton({
         className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-line bg-raised px-4 font-medium"
       >
         {result === 'copied' ? <CheckIcon className="size-5" /> : <CopyIcon className="size-5" />}
-        {result === 'copied' ? 'Copied' : 'Copy for Flickr'}
+        {result === 'copied' ? 'Copied' : 'Copy coordinates'}
       </button>
       <p role="status" className="sr-only">
         {result === 'copied' ? `Copied ${text}` : ''}

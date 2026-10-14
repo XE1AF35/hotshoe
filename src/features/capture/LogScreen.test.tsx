@@ -124,7 +124,7 @@ describe('LogScreen', () => {
     expect(await listEntries(db)).toEqual([]);
   });
 
-  it('copies coordinates for Flickr and saves quick fields to the entry', async () => {
+  it('copies the coordinates and saves quick fields to the entry', async () => {
     const db = createTestDb();
     const gps = installFakeGeolocation();
     const writeText = vi.fn(async () => {});
@@ -138,7 +138,7 @@ describe('LogScreen', () => {
     await waitFor(() => expect(gps.watchers.size).toBe(1));
     act(() => gps.emit(5));
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Copy for Flickr' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Copy coordinates' }));
     expect(await screen.findByRole('button', { name: 'Copied' })).toBeDefined();
     expect(writeText).toHaveBeenCalledWith('-36.848461, 174.763336');
 

@@ -5,7 +5,7 @@ export interface LatLon {
 
 export type CoordFormat = 'decimal' | 'dms';
 
-/** Six decimal places is about 0.1 m, and is as much as Flickr keeps. */
+/** Six decimal places is about 0.1 m, finer than any phone GPS fix. */
 const decimalPlaces = 6;
 
 /** Tenths of a second of arc is about 3 m. */
@@ -17,7 +17,7 @@ export function isValidLatLon({ lat, lon }: LatLon): boolean {
   );
 }
 
-/** `-36.848461, 174.763336`: latitude first, the order Flickr and most map apps expect. */
+/** `-36.848461, 174.763336`: latitude first, the order photo sites and most map apps expect. */
 export function formatDecimal({ lat, lon }: LatLon): string {
   return `${fixedWithoutNegativeZero(lat, decimalPlaces)}, ${fixedWithoutNegativeZero(lon, decimalPlaces)}`;
 }
