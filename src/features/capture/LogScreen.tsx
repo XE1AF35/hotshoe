@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { CameraIcon } from '../../app/icons.tsx';
+import { useHoldUpdates } from '../../app/updates.ts';
 import { useDb } from '../../db/DbProvider.tsx';
 import { useLatestEntry, useSettings } from '../../db/hooks.ts';
 import type { Entry } from '../../db/schema.ts';
@@ -46,6 +47,7 @@ function LogScreenBody({
   const [pendingPhotos, setPendingPhotos] = useState<File[]>([]);
   const [photoMessage, setPhotoMessage] = useState<string | null>(null);
   const camera = usePhotoInputs((files) => setPendingPhotos((waiting) => [...waiting, ...files]));
+  useHoldUpdates(pendingPhotos.length > 0);
 
   const savedEntryId = state.status === 'saved' ? state.entryId : null;
   useEffect(() => {

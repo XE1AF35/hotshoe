@@ -6,7 +6,7 @@ import { MoreScreen } from '../features/settings/MoreScreen.tsx';
 import { InstallBanner } from './InstallBanner.tsx';
 import { type Tab, useTab } from './router.ts';
 import { TabBar } from './TabBar.tsx';
-import { UpdatePrompt } from './UpdatePrompt.tsx';
+import { Updater } from './Updater.tsx';
 
 const screens: Record<Tab, () => JSX.Element> = {
   log: LogScreen,
@@ -30,7 +30,7 @@ export function App() {
         </main>
       </div>
       <TabBar current={tab} />
-      <UpdatePrompt />
+      <Updater />
     </div>
   );
 }

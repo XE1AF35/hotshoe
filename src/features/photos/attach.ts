@@ -1,3 +1,4 @@
+import { holdUpdates } from '../../app/updates.ts';
 import type { HotshoeDb } from '../../db/database.ts';
 import { StorageFullError } from '../../db/errors.ts';
 import { addPhoto } from '../../db/photos.ts';
@@ -24,22 +25,27 @@ export async function attachPhotos(
 ): Promise<AttachResult> {
   let added = 0;
   let problem: AttachResult['problem'] = null;
+  const release = holdUpdates();
 
-  for (const file of files) {
-    try {
-      const processed = await processPhoto(file, quality);
-      await addPhoto(db, { ...processed, entryId, source });
-      added += 1;
-    } catch (error) {
-      if (error instanceof StorageFullError) return { added, problem: 'storage-full' };
-      if (error instanceof PhotoReadError) {
-        problem = 'unreadable';
-        continue;
+  try {
+    for (const file of files) {
+      try {
+        const processed = await processPhoto(file, quality);
+        await addPhoto(db, { ...processed, entryId, source });
+        added += 1;
+      } catch (error) {
+        if (error instanceof StorageFullError) return { added, problem: 'storage-full' };
+        if (error instanceof PhotoReadError) {
+          problem = 'unreadable';
+          continue;
+        }
+        throw error;
       }
-      throw error;
     }
+    return { added, problem };
+  } finally {
+    release();
   }
-  return { added, problem };
 }
 
 export function attachProblemMessage(problem: AttachResult['problem']): string | null {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useSyncExternalStore } from 'react';
+import { useHoldUpdates } from '../../app/updates.ts';
 import { useDb } from '../../db/DbProvider.tsx';
 import { addEntry } from '../../db/entries.ts';
 import { MissingRecordError, StorageFullError } from '../../db/errors.ts';
@@ -40,6 +41,7 @@ export function useCapture({
 }: CaptureOptions): Capture {
   const db = useDb();
   const [state, dispatch] = useReducer(captureReducer, initialCaptureState);
+  useHoldUpdates(state.status === 'locating' || state.status === 'saving');
   const visible = useSyncExternalStore(subscribeVisibility, isVisible);
   const { accuracyTargetM, fixTimeoutS, activeTripId } = settings;
 
