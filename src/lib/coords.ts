@@ -31,6 +31,16 @@ export function formatCoords(coords: LatLon, format: CoordFormat): string {
   return format === 'dms' ? formatDms(coords) : formatDecimal(coords);
 }
 
+/** Latitude and longitude apart, in the same form as formatCoords, for showing on two lines. */
+export function formatCoordParts(
+  { lat, lon }: LatLon,
+  format: CoordFormat,
+): readonly [lat: string, lon: string] {
+  return format === 'dms'
+    ? [dmsPart(lat, 'N', 'S'), dmsPart(lon, 'E', 'W')]
+    : [fixedWithoutNegativeZero(lat, decimalPlaces), fixedWithoutNegativeZero(lon, decimalPlaces)];
+}
+
 function fixedWithoutNegativeZero(value: number, digits: number): string {
   const text = value.toFixed(digits);
   return Number(text) === 0 ? (0).toFixed(digits) : text;

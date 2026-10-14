@@ -6,6 +6,7 @@ import {
   captureReducer,
   type Fix,
   fixFromPosition,
+  fixProgress,
   initialCaptureState,
   looksImprecise,
 } from './capture.ts';
@@ -155,5 +156,14 @@ describe('looksImprecise', () => {
   it('flags kilometre-wide fixes from Precise Location being off', () => {
     expect(looksImprecise(1000)).toBe(false);
     expect(looksImprecise(3000)).toBe(true);
+  });
+});
+
+describe('fixProgress', () => {
+  it('is full at or inside the target and falls off as the fix widens', () => {
+    expect(fixProgress(12, 20)).toBe(1);
+    expect(fixProgress(20, 20)).toBe(1);
+    expect(fixProgress(40, 20)).toBe(0.5);
+    expect(fixProgress(2000, 20)).toBe(0.01);
   });
 });

@@ -119,3 +119,12 @@ export function fixFromPosition(position: GeolocationPosition): Fix {
 export function looksImprecise(accuracyM: number): boolean {
   return accuracyM > 1000;
 }
+
+/**
+ * How close a fix is to the accuracy target, from 0 to 1, for the dial on the Log screen. It is
+ * the target divided by the accuracy, so ±40 m against a 20 m target shows halfway.
+ */
+export function fixProgress(accuracyM: number, targetM: number): number {
+  if (accuracyM <= targetM) return 1;
+  return Math.max(0, Math.min(1, targetM / accuracyM));
+}

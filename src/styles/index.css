@@ -16,6 +16,8 @@
   --color-warning: var(--warning);
   --color-on-warning: var(--on-warning);
   --color-danger-ink: var(--danger-ink);
+  --color-good: var(--good);
+  --color-good-ink: var(--good-ink);
 }
 
 :root {
@@ -30,6 +32,9 @@
   --warning: #fef3c7;
   --on-warning: #78350f;
   --danger-ink: #b91c1c;
+  /* A fix within the accuracy target. */
+  --good: #22c55e;
+  --good-ink: #15803d;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -45,6 +50,8 @@
     --warning: #451a03;
     --on-warning: #fde68a;
     --danger-ink: #fca5a5;
+    --good: #22c55e;
+    --good-ink: #86efac;
   }
 }
 
@@ -67,5 +74,27 @@
   /* Animations use Tailwind's motion-safe: variant, so reduced motion needs no override here. */
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-accent-ink;
+  }
+}
+
+@layer components {
+  /*
+   * Viewfinder corner marks, like the focus brackets in a camera, drawn as eight short gradient
+   * bars so the box needs no extra elements.
+   */
+  .viewfinder {
+    --mark: 1.25rem;
+    --weight: 2px;
+    --mark-colour: var(--accent-ink);
+    background:
+      linear-gradient(var(--mark-colour) 0 0) top left / var(--mark) var(--weight),
+      linear-gradient(var(--mark-colour) 0 0) top left / var(--weight) var(--mark),
+      linear-gradient(var(--mark-colour) 0 0) top right / var(--mark) var(--weight),
+      linear-gradient(var(--mark-colour) 0 0) top right / var(--weight) var(--mark),
+      linear-gradient(var(--mark-colour) 0 0) bottom left / var(--mark) var(--weight),
+      linear-gradient(var(--mark-colour) 0 0) bottom left / var(--weight) var(--mark),
+      linear-gradient(var(--mark-colour) 0 0) bottom right / var(--mark) var(--weight),
+      linear-gradient(var(--mark-colour) 0 0) bottom right / var(--weight) var(--mark);
+    background-repeat: no-repeat;
   }
 }

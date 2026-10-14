@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatCoords, formatDecimal, formatDms, isValidLatLon } from './coords.ts';
+import {
+  formatCoordParts,
+  formatCoords,
+  formatDecimal,
+  formatDms,
+  isValidLatLon,
+} from './coords.ts';
 
 const auckland = { lat: -36.8484609, lon: 174.763336 };
 
@@ -52,5 +58,13 @@ describe('isValidLatLon', () => {
     [{ lat: 0, lon: Number.POSITIVE_INFINITY }, false],
   ])('%o is %s', (coords, expected) => {
     expect(isValidLatLon(coords)).toBe(expected);
+  });
+});
+
+describe('formatCoordParts', () => {
+  it('splits the same text formatCoords joins', () => {
+    for (const format of ['decimal', 'dms'] as const) {
+      expect(formatCoordParts(auckland, format).join(', ')).toBe(formatCoords(auckland, format));
+    }
   });
 });

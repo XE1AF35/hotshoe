@@ -27,7 +27,7 @@ export function ActiveTripPicker({ activeTripId }: { readonly activeTripId: Trip
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex min-h-11 max-w-full items-center gap-2 self-start rounded-full border border-line bg-raised px-4 text-sm"
+        className="inline-flex min-h-11 min-w-0 items-center gap-2 rounded-full border border-line bg-raised px-4 text-sm"
       >
         <span className="text-muted">Trip:</span>
         <span className="truncate font-medium">{active?.name ?? 'None'}</span>

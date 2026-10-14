@@ -56,7 +56,8 @@ describe('LogScreen', () => {
 
     act(() => gps.emit(9));
     expect(await screen.findByRole('heading', { name: 'Logged' })).toBeDefined();
-    expect(screen.getByText('-36.848461, 174.763336')).toBeDefined();
+    expect(screen.getByText('-36.848461')).toBeDefined();
+    expect(screen.getByText('174.763336')).toBeDefined();
     expect(gps.watchers.size).toBe(0);
 
     const [entry] = await listEntries(db);
