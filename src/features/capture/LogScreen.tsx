@@ -140,8 +140,11 @@ function CaptureControls({
         {spokenStatus(state)}
       </p>
 
-      {/* Laid out like a camera: the shutter in the middle, smaller controls either side. */}
-      <div className="grid grid-cols-[1fr_auto_1fr] items-start gap-2">
+      {/*
+       * Laid out like a camera: the shutter in the middle, smaller controls either side. The
+       * circles keep their size while the labels grow with the text size setting and wrap.
+       */}
+      <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2">
         {busy ? (
           <>
             <SideButton onClick={onCancel} disabled={state.status === 'saving'} label="Cancel">
@@ -165,9 +168,9 @@ function CaptureControls({
             <button
               type="button"
               onClick={onStart}
-              className="group flex flex-col items-center gap-2 font-semibold"
+              className="group flex min-w-0 flex-col items-center gap-2 text-center font-semibold"
             >
-              <span className="flex size-24 items-center justify-center rounded-full border-4 border-accent p-1">
+              <span className="flex size-[96px] items-center justify-center rounded-full border-4 border-accent p-1">
                 <span className="flex size-full items-center justify-center rounded-full bg-accent text-on-accent shadow-md group-active:scale-90 motion-safe:transition-transform">
                   <PinIcon className="size-9" />
                 </span>
@@ -201,10 +204,10 @@ function SideButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="group flex flex-col items-center gap-2 pt-4 font-medium text-sm disabled:opacity-50"
+      className="group flex min-w-0 flex-col items-center gap-2 pt-4 text-center font-medium text-sm disabled:opacity-50"
     >
       <span
-        className={`flex size-16 items-center justify-center rounded-full group-active:scale-90 motion-safe:transition-transform ${
+        className={`flex size-[64px] shrink-0 items-center justify-center rounded-full group-active:scale-90 motion-safe:transition-transform ${
           emphasis ? 'bg-accent text-on-accent' : 'border border-line bg-raised'
         }`}
       >
@@ -232,7 +235,7 @@ function AccuracyDial({
 
   return (
     <div aria-hidden="true" className="flex flex-col items-center gap-2 font-semibold">
-      <div className="relative size-24">
+      <div className="relative size-[96px]">
         <svg
           viewBox="0 0 96 96"
           aria-hidden="true"

@@ -33,7 +33,7 @@ export function TabBar({ current }: { readonly current: Tab }) {
               >
                 {/* The current tab's icon sits in a pill, as in iOS and Android tab bars. */}
                 <span
-                  className={`flex h-8 w-14 items-center justify-center rounded-full motion-safe:transition-colors ${
+                  className={`flex h-8 w-full max-w-14 items-center justify-center rounded-full motion-safe:transition-colors ${
                     isCurrent ? 'bg-accent text-on-accent' : ''
                   }`}
                 >

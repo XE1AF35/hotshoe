@@ -21,10 +21,11 @@ export function App() {
 
   return (
     // Only the content scrolls. The tab bar sits outside the scrolling area, so content and focus
-    // never slide underneath it (WCAG 2.4.11 and 2.5.8).
+    // never slide underneath it (WCAG 2.4.11 and 2.5.8). The scroll padding keeps focus clear of
+    // bars stuck to the bottom of the content, such as the one in Select mode.
     <div className="flex h-dvh flex-col">
       <InstallBanner />
-      <div className="flex flex-1 flex-col overflow-y-auto overscroll-contain">
+      <div className="flex flex-1 scroll-pb-36 flex-col overflow-y-auto overscroll-contain">
         <main className="mx-auto flex w-full max-w-xl flex-1 flex-col px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-6">
           <Screen />
         </main>

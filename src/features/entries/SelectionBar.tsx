@@ -40,7 +40,8 @@ export function SelectionBar({
           {count === total ? 'Select none' : 'Select all'}
         </button>
       </div>
-      <div className="grid grid-cols-[auto_1fr] gap-2">
+      {/* Wraps onto two lines when large text makes the row too wide. */}
+      <div className="flex flex-wrap gap-2">
         <label htmlFor={formatId} className="sr-only">
           Export format
         </label>
@@ -48,7 +49,7 @@ export function SelectionBar({
           id={formatId}
           value={format}
           onChange={(event) => setFormat(event.target.value as ExportFormat)}
-          className="min-h-12 rounded-xl border border-line bg-raised px-3 text-base"
+          className="min-h-12 shrink-0 rounded-xl border border-line bg-raised px-3 text-base"
         >
           {exportFormats.map(({ value, title }) => (
             <option key={value} value={value}>
@@ -60,7 +61,7 @@ export function SelectionBar({
           type="button"
           onClick={() => void share()}
           disabled={count === 0 || ready === null}
-          className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-accent font-semibold text-on-accent disabled:opacity-60"
+          className="flex min-h-12 min-w-max flex-1 items-center justify-center gap-2 rounded-xl bg-accent px-4 font-semibold text-on-accent disabled:opacity-60"
         >
           <ShareIcon className="size-5" />
           Export selected
