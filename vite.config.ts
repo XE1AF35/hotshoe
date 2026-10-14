@@ -38,9 +38,23 @@ export default defineConfig({
   base,
   plugins: [react(), tailwindcss(), contentSecurityPolicyMeta()],
   test: {
-    environment: 'happy-dom',
-    include: ['src/**/*.test.{ts,tsx}'],
-    setupFiles: ['src/test/setup.ts'],
     restoreMocks: true,
+    projects: [
+      {
+        // Logic and database tests. Node's Blob survives IndexedDB's structured clone.
+        extends: true,
+        test: { name: 'unit', include: ['src/**/*.test.ts'], environment: 'node' },
+      },
+      {
+        // Component tests.
+        extends: true,
+        test: {
+          name: 'dom',
+          include: ['src/**/*.test.tsx'],
+          environment: 'happy-dom',
+          setupFiles: ['src/test/setup-dom.ts'],
+        },
+      },
+    ],
   },
 });
