@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { addEntry } from '../../db/entries.ts';
 import { addPhoto } from '../../db/photos.ts';
+import type { EntryId } from '../../db/schema.ts';
 import { addTrip } from '../../db/trips.ts';
 import { createTestDb, jpegBlob, newEntryInput } from '../../test/db.ts';
 import { createExport, slug } from './exportFile.ts';
@@ -45,6 +46,14 @@ describe('createExport', () => {
     const all = await createExport(db, { format: 'gpx', scope: 'all', now });
     expect(all.entries).toBe(2);
     expect(all.file.name).toMatch(/^hotshoe-all-\d{8}\.gpx$/);
+
+    const picked = await createExport(db, {
+      format: 'csv',
+      scope: { entryIds: [onTrip.id, 'deleted-since' as EntryId] },
+      now,
+    });
+    expect(picked.entries).toBe(1);
+    expect(picked.file.name).toMatch(/^hotshoe-selection-\d{8}\.csv$/);
   });
 });
 

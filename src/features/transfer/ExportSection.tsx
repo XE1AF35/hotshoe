@@ -1,51 +1,25 @@
 import { useEffect, useId, useState } from 'react';
 import { ShareIcon } from '../../app/icons.tsx';
-import { holdUpdates } from '../../app/updates.ts';
-import { useDb } from '../../db/DbProvider.tsx';
 import { useEntries, useTripEntryCounts, useTrips } from '../../db/hooks.ts';
-import { saveFile } from '../../lib/share.ts';
-import type { CreatedExport, ExportScope } from './exportFile.ts';
+import type { TripId } from '../../db/schema.ts';
 import type { ExportFormat } from './formats.ts';
+import { usePreparedExport } from './usePreparedExport.ts';
 
-const loadExporter = () => import('./exportFile.ts');
-
-const formats: ReadonlyArray<{ value: ExportFormat; title: string; detail: string }> = [
-  { value: 'gpx', title: 'GPX', detail: 'For geotagging in Lightroom, darktable, or digiKam.' },
-  { value: 'csv', title: 'CSV', detail: 'For spreadsheets.' },
-  { value: 'geojson', title: 'GeoJSON', detail: 'For maps and GIS apps.' },
-];
+export const exportFormats: ReadonlyArray<{ value: ExportFormat; title: string; detail: string }> =
+  [
+    { value: 'gpx', title: 'GPX', detail: 'For geotagging in Lightroom, darktable, or digiKam.' },
+    { value: 'csv', title: 'CSV', detail: 'For spreadsheets.' },
+    { value: 'geojson', title: 'GeoJSON', detail: 'For maps and GIS apps.' },
+  ];
 
 export function ExportSection() {
-  const db = useDb();
   const entries = useEntries();
   const trips = useTrips();
   const tripCounts = useTripEntryCounts();
   const scopeId = useId();
-  const [scope, setScope] = useState<ExportScope>('all');
+  const [scope, setScope] = useState<'all' | TripId>('all');
   const [format, setFormat] = useState<ExportFormat>('gpx');
-  const [ready, setReady] = useState<CreatedExport | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  // The file is made ahead of the tap: iOS only opens the share sheet straight from a tap, so
-  // there is no time to read the database in between. It is remade whenever the entries change.
-  useEffect(() => {
-    if (entries === undefined) return;
-    let current = true;
-    setReady(null);
-    setError(null);
-    loadExporter()
-      .then(({ createExport }) => createExport(db, { format, scope }))
-      .then((created) => {
-        if (current) setReady(created);
-      })
-      .catch(() => {
-        if (current) setError("Couldn't prepare the export. Try again.");
-      });
-    return () => {
-      current = false;
-    };
-  }, [db, entries, format, scope]);
+  const { ready, message, error, share } = usePreparedExport(format, scope, entries);
 
   // A trip that has been deleted can't be exported, so fall back to everything.
   useEffect(() => {
@@ -53,20 +27,6 @@ export function ExportSection() {
       setScope('all');
     }
   }, [scope, trips]);
-
-  async function share(created: CreatedExport) {
-    setError(null);
-    setMessage(null);
-    const release = holdUpdates();
-    try {
-      const result = await saveFile(created.file);
-      if (result !== 'cancelled') setMessage(`Exported ${created.file.name}.`);
-    } catch {
-      setError("Couldn't share the export. Try again.");
-    } finally {
-      release();
-    }
-  }
 
   return (
     <section aria-labelledby="export-heading" className="space-y-3">
@@ -86,10 +46,7 @@ export function ExportSection() {
           <select
             id={scopeId}
             value={scope}
-            onChange={(event) => {
-              setMessage(null);
-              setScope(event.target.value as ExportScope);
-            }}
+            onChange={(event) => setScope(event.target.value as 'all' | TripId)}
             className="min-h-12 w-full rounded-xl border border-line bg-surface px-3 text-base"
           >
             <option value="all">All entries ({entries?.length ?? 0})</option>
@@ -103,7 +60,7 @@ export function ExportSection() {
 
         <fieldset className="space-y-1">
           <legend className="mb-1 font-medium text-sm">Format</legend>
-          {formats.map(({ value, title, detail }) => (
+          {exportFormats.map(({ value, title, detail }) => (
             <label
               key={value}
               className="flex min-h-12 items-start gap-3 rounded-xl px-3 py-2 has-checked:bg-surface"
@@ -112,10 +69,7 @@ export function ExportSection() {
                 type="radio"
                 name="export-format"
                 checked={format === value}
-                onChange={() => {
-                  setMessage(null);
-                  setFormat(value);
-                }}
+                onChange={() => setFormat(value)}
                 className="mt-0.5 size-5 shrink-0 accent-accent-ink"
               />
               <span>
@@ -128,7 +82,7 @@ export function ExportSection() {
 
         <button
           type="button"
-          onClick={() => ready && void share(ready)}
+          onClick={() => void share()}
           disabled={ready === null || ready.entries === 0}
           className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-accent font-semibold text-on-accent disabled:opacity-60"
         >

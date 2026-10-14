@@ -35,3 +35,39 @@ test('exports a logged entry as GPX and as CSV', async ({ page }) => {
   expect(csv).toContain(',-36.840556,174.766389,6,');
   expect(csv).toContain(',Ferry terminal,');
 });
+
+test('exports only the entries ticked in Select mode', async ({ page, context }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'canShare', { value: undefined });
+  });
+  await page.goto('./');
+  for (const [index, label] of ['First', 'Second', 'Third'].entries()) {
+    await context.setGeolocation({ ...wharf, latitude: wharf.latitude + index / 1000 });
+    await page.getByRole('button', { name: 'Log location' }).click();
+    await expect(page.getByRole('heading', { name: 'Logged' })).toBeVisible();
+    await page.getByLabel('Label').fill(label);
+    await page.getByLabel('Label').press('Enter');
+    await expect(page.getByLabel('Label')).toHaveValue(label);
+  }
+
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: 'Entries' })
+    .click();
+  await expect(page.getByRole('button', { name: /Third/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Select' }).click();
+  await page.getByRole('checkbox', { name: /First/ }).check();
+  await page.getByRole('checkbox', { name: /Third/ }).check();
+  await expect(page.getByText('2 selected')).toBeVisible();
+
+  await page.getByLabel('Export format').selectOption('csv');
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export selected' }).click();
+  expect((await download).suggestedFilename()).toMatch(/^hotshoe-selection-\d{8}\.csv$/);
+  const csv = await readFile((await (await download).path()) ?? '', 'utf8');
+  const rows = csv.trim().split('\r\n').slice(1);
+  expect(rows.map((row) => row.split(',')[8])).toEqual(['First', 'Third']);
+
+  await page.getByRole('button', { name: 'Done' }).click();
+  await expect(page.getByRole('checkbox')).toHaveCount(0);
+});

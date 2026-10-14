@@ -1,10 +1,10 @@
 import type { HotshoeDb } from '../../db/database.ts';
-import type { EntryId, PhotoId, TripId } from '../../db/schema.ts';
+import type { Entry, EntryId, PhotoId, TripId } from '../../db/schema.ts';
 import { fileDateStamp } from '../../lib/time.ts';
 import { type ExportFormat, type ExportRow, formatDetails, formatExport } from './formats.ts';
 
-/** Every entry, or one trip's. */
-export type ExportScope = 'all' | TripId;
+/** Every entry, one trip's, or a hand-picked set. */
+export type ExportScope = 'all' | TripId | { readonly entryIds: readonly EntryId[] };
 
 export interface CreatedExport {
   readonly file: File;
@@ -24,12 +24,7 @@ export async function createExport(
     db.trips,
     db.entries,
     db.photos,
-    () =>
-      Promise.all([
-        db.trips.toArray(),
-        scope === 'all' ? db.entries.toArray() : db.entries.where('tripId').equals(scope).toArray(),
-        photoIdsByEntry(db),
-      ]),
+    () => Promise.all([db.trips.toArray(), entriesInScope(db, scope), photoIdsByEntry(db)]),
   );
   const tripNames = new Map(trips.map((trip) => [trip.id, trip.name]));
   const rows: ExportRow[] = entries.map((entry) => ({
@@ -39,12 +34,27 @@ export async function createExport(
   }));
 
   const { extension, mimeType } = formatDetails[format];
-  const scopeName = scope === 'all' ? 'all' : slug(tripNames.get(scope) ?? 'trip');
+  const scopeName =
+    scope === 'all'
+      ? 'all'
+      : typeof scope === 'object'
+        ? 'selection'
+        : slug(tripNames.get(scope) ?? 'trip');
   const name = `hotshoe-${scopeName}-${fileDateStamp(now)}.${extension}`;
   return {
     file: new File([formatExport(format, rows, now)], name, { type: mimeType }),
     entries: rows.length,
   };
+}
+
+async function entriesInScope(db: HotshoeDb, scope: ExportScope): Promise<Entry[]> {
+  if (scope === 'all') return db.entries.toArray();
+  if (typeof scope === 'object') {
+    // Entries deleted since they were picked are skipped.
+    const found = await db.entries.bulkGet([...scope.entryIds]);
+    return found.filter((entry) => entry !== undefined);
+  }
+  return db.entries.where('tripId').equals(scope).toArray();
 }
 
 /** Each entry's photo ids in the order the entry shows them, read from an index alone. */

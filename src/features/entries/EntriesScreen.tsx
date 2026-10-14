@@ -1,16 +1,20 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CameraIcon } from '../../app/icons.tsx';
 import { ScreenHeader } from '../../app/ScreenHeader.tsx';
 import { Toast } from '../../app/Toast.tsx';
 import { useDb } from '../../db/DbProvider.tsx';
 import { type DeletedEntry, restoreEntry } from '../../db/entries.ts';
 import { useEntries, usePhotoCounts, useSettings, useTrips } from '../../db/hooks.ts';
+import { firstThumb } from '../../db/photos.ts';
 import type { Entry, EntryId, Trip, TripId } from '../../db/schema.ts';
 import { defaultSettings } from '../../db/settings.ts';
 import { formatDay, formatLoggedClock } from '../../lib/format.ts';
+import { useObjectUrl } from '../../lib/useObjectUrl.ts';
 import { AccuracyPill } from '../capture/AccuracyPill.tsx';
 import { EntrySheet } from './EntrySheet.tsx';
 import { groupByDayAndTrip } from './grouping.ts';
+import { SelectionBar } from './SelectionBar.tsx';
 
 export function EntriesScreen() {
   const db = useDb();
@@ -21,6 +25,17 @@ export function EntriesScreen() {
   const [openId, setOpenId] = useState<EntryId | null>(null);
   const [deleted, setDeleted] = useState<DeletedEntry | null>(null);
   const dismissToast = useCallback(() => setDeleted(null), []);
+  // Select mode: tick entries to export just those.
+  const [selecting, setSelecting] = useState(false);
+  const [picked, setPicked] = useState<ReadonlySet<EntryId>>(new Set());
+
+  function toggle(id: EntryId) {
+    setPicked((current) => {
+      const next = new Set(current);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }
 
   const tripsById = useMemo(
     () => new Map<TripId, Trip>((trips ?? []).map((trip) => [trip.id, trip])),
@@ -31,7 +46,20 @@ export function EntriesScreen() {
 
   return (
     <section aria-labelledby="screen-title" className="space-y-6">
-      <ScreenHeader title="Entries" />
+      <ScreenHeader title="Entries">
+        {entries !== undefined && entries.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setSelecting(!selecting);
+              setPicked(new Set());
+            }}
+            className="min-h-11 rounded-full border border-line bg-raised px-4 font-medium text-sm"
+          >
+            {selecting ? 'Done' : 'Select'}
+          </button>
+        )}
+      </ScreenHeader>
 
       {entries !== undefined && entries.length === 0 && (
         <p className="text-muted">
@@ -57,6 +85,11 @@ export function EntriesScreen() {
                       accuracyTargetM={settings?.accuracyTargetM ?? defaultSettings.accuracyTargetM}
                       photos={photoCounts?.get(entry.id) ?? 0}
                       onOpen={() => setOpenId(entry.id)}
+                      selection={
+                        selecting
+                          ? { checked: picked.has(entry.id), onToggle: () => toggle(entry.id) }
+                          : null
+                      }
                     />
                   </li>
                 ))}
@@ -65,6 +98,16 @@ export function EntriesScreen() {
           ))}
         </section>
       ))}
+
+      {selecting && entries !== undefined && (
+        <SelectionBar
+          picked={picked}
+          total={entries.length}
+          changes={entries}
+          onSelectAll={() => setPicked(new Set(entries.map((entry) => entry.id)))}
+          onSelectNone={() => setPicked(new Set())}
+        />
+      )}
 
       <EntrySheet
         entry={openEntry}
@@ -96,18 +139,48 @@ function EntryRow({
   accuracyTargetM,
   photos,
   onOpen,
+  selection,
 }: {
   readonly entry: Entry;
   readonly accuracyTargetM: number;
   readonly photos: number;
   readonly onOpen: () => void;
+  /** In select mode the row ticks a checkbox instead of opening the entry. */
+  readonly selection: { readonly checked: boolean; readonly onToggle: () => void } | null;
+}) {
+  const className =
+    'flex min-h-16 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface';
+  if (selection) {
+    return (
+      <label className={`${className} has-checked:bg-surface`}>
+        <input
+          type="checkbox"
+          checked={selection.checked}
+          onChange={selection.onToggle}
+          className="size-5 shrink-0 accent-accent-ink"
+        />
+        <EntryRowContent entry={entry} accuracyTargetM={accuracyTargetM} photos={photos} />
+      </label>
+    );
+  }
+  return (
+    <button type="button" onClick={onOpen} className={className}>
+      <EntryRowContent entry={entry} accuracyTargetM={accuracyTargetM} photos={photos} />
+    </button>
+  );
+}
+
+function EntryRowContent({
+  entry,
+  accuracyTargetM,
+  photos,
+}: {
+  readonly entry: Entry;
+  readonly accuracyTargetM: number;
+  readonly photos: number;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className="flex min-h-16 w-full items-center gap-3 px-4 py-2.5 text-left active:bg-surface"
-    >
+    <>
       <span className="w-18 shrink-0 font-mono text-sm tabular-nums">
         {formatLoggedClock(entry.loggedAt, entry)}
       </span>
@@ -120,13 +193,54 @@ function EntryRow({
           {entry.frame !== null && <span>Frame {entry.frame}</span>}
         </span>
       </span>
-      {photos > 0 && (
-        <span className="flex items-center gap-1 text-muted text-sm">
-          <CameraIcon className="size-4" />
+      {photos > 0 && <RowThumbnail entryId={entry.id} photos={photos} />}
+    </>
+  );
+}
+
+/**
+ * The first photo's thumbnail, with a count when there are more. Read only once the row scrolls
+ * into view, because each stored photo carries its full image too.
+ */
+function RowThumbnail({ entryId, photos }: { readonly entryId: EntryId; readonly photos: number }) {
+  const db = useDb();
+  const box = useRef<HTMLSpanElement>(null);
+  const [visible, setVisible] = useState(false);
+  const thumb = useLiveQuery(
+    () => (visible ? firstThumb(db, entryId) : null),
+    [db, entryId, visible],
+  );
+  const url = useObjectUrl(thumb);
+
+  useEffect(() => {
+    const element = box.current;
+    if (!element || visible) return;
+    const observer = new IntersectionObserver(([seen]) => {
+      if (seen?.isIntersecting) setVisible(true);
+    });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [visible]);
+
+  return (
+    <span
+      ref={box}
+      className="relative flex size-12 shrink-0 items-center justify-center rounded-lg bg-surface ring-1 ring-line"
+    >
+      {url ? (
+        <img src={url} alt="" className="size-full rounded-lg object-cover" />
+      ) : (
+        <CameraIcon className="size-5 text-muted" />
+      )}
+      {photos > 1 && (
+        <span
+          aria-hidden="true"
+          className="-top-1.5 -right-1.5 absolute flex size-5 items-center justify-center rounded-full bg-ink font-semibold text-surface text-xs"
+        >
           {photos}
-          <span className="sr-only">{photos === 1 ? 'photo' : 'photos'}</span>
         </span>
       )}
-    </button>
+      <span className="sr-only">{photos === 1 ? '1 photo' : `${photos} photos`}</span>
+    </span>
   );
 }
