@@ -1,5 +1,6 @@
 import { ScreenHeader } from '../../app/ScreenHeader.tsx';
 import { BackupSection } from '../transfer/BackupSection.tsx';
+import { ExportSection } from '../transfer/ExportSection.tsx';
 import { TripsSection } from '../trips/TripsSection.tsx';
 import { SettingsSection } from './SettingsSection.tsx';
 
@@ -8,6 +9,7 @@ export function MoreScreen() {
     <section aria-labelledby="screen-title" className="space-y-8">
       <ScreenHeader title="More" />
       <BackupSection />
+      <ExportSection />
       <TripsSection />
       <SettingsSection />
       <section aria-labelledby="about-heading" className="space-y-2 text-sm">
