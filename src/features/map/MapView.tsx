@@ -11,6 +11,7 @@ import {
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { useEffect, useRef, useState } from 'react';
 import type { EntryId } from '../../db/schema.ts';
+import { currentTheme, onThemeChange } from '../../lib/theme.ts';
 import { mapStyleUrl } from './mapConfig.ts';
 import type { Points } from './points.ts';
 
@@ -61,13 +62,12 @@ export default function MapView({
   useEffect(() => {
     const element = container.current;
     if (!element) return;
-    const dark = window.matchMedia('(prefers-color-scheme: dark)');
 
     let map: MapLibreMap;
     try {
       map = new MapLibreMap({
         container: element,
-        style: mapStyleUrl(dark.matches),
+        style: mapStyleUrl(currentTheme() === 'dark'),
         ...initialView(latest.current.points.bounds),
         attributionControl: false,
         maxZoom: 18,
@@ -122,11 +122,12 @@ export default function MapView({
       }
     });
 
-    const onThemeChange = () => map.setStyle(mapStyleUrl(dark.matches), { diff: false });
-    dark.addEventListener('change', onThemeChange);
+    const stopFollowingTheme = onThemeChange((theme) =>
+      map.setStyle(mapStyleUrl(theme === 'dark'), { diff: false }),
+    );
 
     return () => {
-      dark.removeEventListener('change', onThemeChange);
+      stopFollowingTheme();
       map.remove();
       mapRef.current = null;
     };

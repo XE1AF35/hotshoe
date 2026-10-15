@@ -36,11 +36,13 @@ Automated tests run in WebKit, which is close to iOS Safari but not the same. Ru
 ## Map
 
 - [ ] The Map tab asks before loading; tap **Load map**: points and clusters show, and the map follows dark mode.
+- [ ] With the map open, change **Appearance** in Settings: the map switches to match.
 - [ ] Tap a point: its card shows the thumbnail and copies coordinates.
 - [ ] View an area, then turn on flight mode and reopen the map: that area still shows.
 
 ## Storage and accessibility
 
+- [ ] Settings, **Appearance**: Light and Dark stay that way when the iPhone switches mode, System follows it, and the status bar matches. Force-quit and reopen: the choice is kept, with no flash of the other mode.
 - [ ] More, Storage: it says iOS has agreed to keep the data (after the first log).
 - [ ] Set the largest text size (Settings, Accessibility, Display & Text Size, Larger Text): every screen still fits without sideways scrolling.
 - [ ] With VoiceOver on, log a location: the stages are announced, and every button has a name.

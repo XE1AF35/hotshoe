@@ -27,6 +27,7 @@ Hotshoe works offline after the first visit, and updates itself the next time yo
 - **Trips:** pick an active trip on the Log screen and new entries join it. Open a trip on the More tab for its summary: entries and photos, the dates and days it covers, the rough distance in straight lines between entries, and how many weak fixes it has.
 - **Entries:** grouped by day and trip. Tap one to edit it, add photos, or show it on the map. **Select** lets you tick entries and export just those.
 - **Map:** asks before loading, because the map comes from an online service (see Privacy).
+- **Light or dark:** Hotshoe follows your iPhone's setting. To keep it light or dark whatever the iPhone does, choose **Appearance** in Settings on the More tab.
 
 ## Geotagging your photos
 
@@ -86,7 +87,7 @@ Playwright's WebKit build needs Ubuntu or Debian system libraries. On other Linu
 - `BASE_PATH`: the path the app is served from. Defaults to `/hotshoe/` for GitHub Pages. Use `/` for a custom domain.
 - `PWA_SELF_DESTROY=true`: builds a service worker that removes itself and its caches. Deploy this only to recover from a broken release, then deploy a normal build.
 
-Everything Hotshoe stores in the browser (the database and caches) is named with a `hotshoe` prefix, so it never clashes with other apps served from the same address.
+Everything Hotshoe stores in the browser (the database, the caches, and the light or dark choice in local storage) is named with a `hotshoe` prefix, so it never clashes with other apps served from the same address.
 
 ### Icons
 

@@ -86,6 +86,35 @@ for (const colorScheme of ['light', 'dark'] as const) {
   });
 }
 
+test('lets you choose light or dark mode, and keeps the choice', async ({ page }) => {
+  const errors = collectErrors(page);
+  const html = page.locator('html');
+  const statusBar = page.locator('meta[name="theme-color"]');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.goto('./#/more');
+  await expect(html).toHaveAttribute('data-theme', 'dark');
+
+  await page.getByRole('radio', { name: 'Light', exact: true }).check();
+  await expect(html).toHaveAttribute('data-theme', 'light');
+  await expect(statusBar).toHaveAttribute('content', '#fafaf9');
+  expect(await page.evaluate(() => getComputedStyle(document.body).backgroundColor)).toBe(
+    'rgb(250, 250, 249)',
+  );
+
+  // Kept after a reload, and in place before the app's own code runs, so it never flashes dark.
+  await page.reload({ waitUntil: 'commit' });
+  await page.waitForFunction(() => document.documentElement.dataset.theme !== undefined);
+  await expect(html).toHaveAttribute('data-theme', 'light');
+  await expect(page.getByRole('radio', { name: 'Light', exact: true })).toBeChecked();
+
+  // System follows the phone again, including when it switches.
+  await page.getByRole('radio', { name: /System/ }).check();
+  await expect(html).toHaveAttribute('data-theme', 'dark');
+  await page.emulateMedia({ colorScheme: 'light' });
+  await expect(html).toHaveAttribute('data-theme', 'light');
+  expect(errors).toEqual([]);
+});
+
 test('links to the source code on GitHub from the More tab', async ({ page }) => {
   await page.goto('./#/more');
   const link = page.getByRole('link', { name: /Hotshoe on GitHub/ });

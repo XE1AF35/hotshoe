@@ -8,6 +8,7 @@ import {
   setSetting,
 } from '../../db/settings.ts';
 import { type CoordFormat, type DecimalMark, formatCoords } from '../../lib/coords.ts';
+import { AppearanceSetting } from './AppearanceSetting.tsx';
 
 const example = { lat: -36.848461, lon: 174.763336 };
 const accuracyChoices = [10, 20, 30, 50, 100] as const;
@@ -36,6 +37,8 @@ export function SettingsSection() {
       <h2 id="settings-heading" className="font-semibold text-lg">
         Settings
       </h2>
+
+      <AppearanceSetting />
 
       <fieldset className="space-y-1">
         <legend className="mb-1 font-medium text-sm">Coordinate format for copying</legend>
