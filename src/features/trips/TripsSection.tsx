@@ -4,10 +4,11 @@ import { useDb } from '../../db/DbProvider.tsx';
 import { InvalidInputError } from '../../db/errors.ts';
 import { useSettings, useTripEntryCounts, useTrips } from '../../db/hooks.ts';
 import { limits, type Trip, type TripId } from '../../db/schema.ts';
-import { setSetting } from '../../db/settings.ts';
+import { defaultSettings, setSetting } from '../../db/settings.ts';
 import { deleteTrip, renameTrip, setTripArchived } from '../../db/trips.ts';
 import { CameraClockPanel } from './CameraClockPanel.tsx';
 import { NewTripForm } from './NewTripForm.tsx';
+import { TripSummaryCard } from './TripSummaryCard.tsx';
 
 export function TripsSection() {
   const trips = useTrips();
@@ -50,6 +51,7 @@ export function TripsSection() {
             trip={openTrip}
             entries={counts?.get(openTrip.id) ?? 0}
             isActive={openTrip.id === settings?.activeTripId}
+            accuracyTargetM={settings?.accuracyTargetM ?? defaultSettings.accuracyTargetM}
             onDone={() => setOpenId(null)}
           />
         )}
@@ -66,11 +68,13 @@ function TripForm({
   trip,
   entries,
   isActive,
+  accuracyTargetM,
   onDone,
 }: {
   readonly trip: Trip;
   readonly entries: number;
   readonly isActive: boolean;
+  readonly accuracyTargetM: number;
   readonly onDone: () => void;
 }) {
   const db = useDb();
@@ -98,6 +102,8 @@ function TripForm({
 
   return (
     <div className="space-y-4">
+      <TripSummaryCard tripId={trip.id} accuracyTargetM={accuracyTargetM} />
+
       <form onSubmit={save} className="space-y-1">
         <label htmlFor={id} className="block font-medium text-sm">
           Name
