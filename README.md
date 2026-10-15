@@ -1,4 +1,4 @@
-# Hotshoe
+# <img src="public/app-icon.png" width="40" height="40" alt=""> Hotshoe
 
 Log where you took a photo, so you can geotag it later.
 
