@@ -22,7 +22,7 @@ Hotshoe works offline after the first visit, and updates itself the next time yo
 - **Log:** tap **Log location** as you take a photo. Hotshoe waits until the fix is within your accuracy target (20 m unless you change it), then saves. **Use this fix** saves the best fix so far, marked as a weak fix if it missed the target. **Log with photo** also opens the camera for a reference shot.
 - **Label and frame:** type them on the card after logging. Nothing blocks the next log.
 - **Copy coordinates:** pastes as `-36.848461, 174.763336`, or as degrees, minutes, and seconds if you choose that in Settings. Choose a decimal comma in Settings for apps that want `-36,848461`, and tap either line of an entry's coordinates to copy just that number.
-- **Trips:** pick an active trip on the Log screen and new entries join it.
+- **Trips:** pick an active trip on the Log screen and new entries join it. Open a trip on the More tab for its summary: entries and photos, the dates and days it covers, the rough distance in straight lines between entries, and how many weak fixes it has.
 - **Entries:** grouped by day and trip. Tap one to edit it, add photos, or show it on the map. **Select** lets you tick entries and export just those.
 - **Map:** asks before loading, because the map comes from an online service (see Privacy).
 
