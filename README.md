@@ -8,6 +8,8 @@ Your entries stay on your phone. There is no account, no server, and no tracking
 
 **Open it:** https://xe1af35.github.io/hotshoe/
 
+<img src="docs/screenshots/phone-app.png" width="840" alt="Hotshoe on an iPhone: a location just logged with its accuracy and a label, the entries grouped by day and trip with photo thumbnails, and a map of every entry">
+
 ## Install on iPhone
 
 1. Open the link above in **Safari**.
