@@ -77,7 +77,7 @@ export default defineConfig({
         orientation: 'portrait',
         theme_color: dark,
         background_color: dark,
-        // Made from public/favicon.svg (see pwa-assets.config.js).
+        // Made from public/app-icon.png (see pwa-assets.config.js).
         icons: [
           { src: 'pwa-64x64.png', sizes: '64x64', type: 'image/png' },
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },

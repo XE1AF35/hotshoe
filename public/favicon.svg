@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <title>Hotshoe</title>
-  <rect width="512" height="512" rx="112" fill="#0c0a09"/>
-  <path d="M256 84c-72 0-128 55-128 125 0 94 128 213 128 213s128-119 128-213c0-70-56-125-128-125z" fill="#fbbf24"/>
-  <circle cx="256" cy="209" r="50" fill="#0c0a09"/>
-  <rect x="160" y="438" width="192" height="22" rx="8" fill="#fbbf24"/>
-</svg>

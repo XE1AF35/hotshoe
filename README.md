@@ -90,7 +90,7 @@ Everything Hotshoe stores in the browser (the database and caches) is named with
 
 ### Icons
 
-The app icons in `public/` are made from `public/favicon.svg`. After changing the SVG, run `pnpm dlx @vite-pwa/assets-generator@2.0.0` and commit the results.
+The app icons in `public/` are made from `public/app-icon.png`, a hand-drawn icon. After changing the drawing, run `pnpm dlx @vite-pwa/assets-generator@2.0.0` and commit the results.
 
 ## Licence
 
