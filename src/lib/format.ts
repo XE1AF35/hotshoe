@@ -1,4 +1,4 @@
-import type { DayKey, TimeContext } from './time.ts';
+import { type DayKey, formatUtcOffset, type TimeContext } from './time.ts';
 
 /** `±8 m`, `±120 m`, or `±1.4 km`. */
 export function formatAccuracy(metres: number): string {
@@ -38,11 +38,7 @@ function formatInZone(
   } catch {
     // Unknown zone: show the recorded offset's local time, marked with that offset.
     const shifted = epochMs + context.utcOffsetMin * 60_000;
-    const sign = context.utcOffsetMin < 0 ? '-' : '+';
-    const hours = Math.floor(Math.abs(context.utcOffsetMin) / 60);
-    const minutes = Math.abs(context.utcOffsetMin) % 60;
-    const offset = `UTC${sign}${hours}${minutes ? `:${String(minutes).padStart(2, '0')}` : ''}`;
-    return `${formatter('UTC', options).format(shifted)} (${offset})`;
+    return `${formatter('UTC', options).format(shifted)} (${formatUtcOffset(context.utcOffsetMin)})`;
   }
 }
 

@@ -23,10 +23,14 @@ describe('formatLoggedTime', () => {
     expect(text).toContain('14 Oct');
   });
 
-  it('falls back to the recorded offset for an unknown zone', () => {
-    const text = formatLoggedTime(instant, { timeZone: 'Mars/Base', utcOffsetMin: 345 });
-    expect(text).toContain('6:50:09');
-    expect(text).toContain('(UTC+5:45)');
+  it.each([
+    [780, '2:05:09', '(UTC+13:00)'],
+    [345, '6:50:09', '(UTC+05:45)'],
+    [0, '1:05:09', '(UTC)'],
+  ])('falls back to the recorded offset %d for an unknown zone', (utcOffsetMin, clock, label) => {
+    const text = formatLoggedTime(instant, { timeZone: 'Mars/Base', utcOffsetMin });
+    expect(text).toContain(clock);
+    expect(text).toContain(label);
   });
 });
 
