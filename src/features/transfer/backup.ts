@@ -40,6 +40,9 @@ export interface CreatedBackup {
   readonly file: File;
   readonly entries: number;
   readonly photos: number;
+  /** When the snapshot was taken. Anything changed after this isn't in the file. */
+  readonly madeAt: number;
+  readonly includesPhotos: boolean;
 }
 
 export async function createBackup(
@@ -85,6 +88,8 @@ export async function createBackup(
     }),
     entries: entries.length,
     photos: photos.length,
+    madeAt: now,
+    includesPhotos: includePhotos,
   };
 }
 

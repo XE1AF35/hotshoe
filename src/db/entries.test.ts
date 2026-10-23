@@ -1,13 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createTestDb, jpegBlob, newEntryInput } from '../test/db.ts';
-import {
-  addEntry,
-  countEntriesChangedSince,
-  deleteEntry,
-  listEntries,
-  restoreEntry,
-  updateEntry,
-} from './entries.ts';
+import { addEntry, deleteEntry, listEntries, restoreEntry, updateEntry } from './entries.ts';
 import { InvalidInputError, MissingRecordError } from './errors.ts';
 import { addPhoto, listPhotos } from './photos.ts';
 import type { EntryId, TripId } from './schema.ts';
@@ -126,17 +119,5 @@ describe('listEntries', () => {
       'second',
       'first',
     ]);
-  });
-});
-
-describe('countEntriesChangedSince', () => {
-  it('counts entries added or edited after the given time', async () => {
-    const db = createTestDb();
-    const old = await addEntry(db, newEntryInput(), 1000);
-    await addEntry(db, newEntryInput(), 3000);
-    expect(await countEntriesChangedSince(db, 2000)).toBe(1);
-
-    await updateEntry(db, old.id, { label: 'edited' }, 4000);
-    expect(await countEntriesChangedSince(db, 2000)).toBe(2);
   });
 });

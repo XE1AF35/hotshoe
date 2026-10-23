@@ -9,6 +9,8 @@ export type PersistResult = 'granted' | 'denied' | 'unsupported';
 export interface Settings {
   activeTripId: TripId | null;
   lastBackupAt: number | null;
+  /** Kept apart from lastBackupAt, since a backup can leave the photos out. */
+  lastPhotoBackupAt: number | null;
   coordFormat: CoordFormat;
   decimalMark: DecimalMark;
   accuracyTargetM: number;
@@ -29,6 +31,7 @@ export type SettingKey = keyof Settings;
 export const defaultSettings: Readonly<Settings> = {
   activeTripId: null,
   lastBackupAt: null,
+  lastPhotoBackupAt: null,
   coordFormat: 'decimal',
   decimalMark: 'point',
   accuracyTargetM: 20,
@@ -48,6 +51,7 @@ const isTimestampOrNull = (value: unknown): value is number | null =>
 const guards: { [K in SettingKey]: (value: unknown) => value is Settings[K] } = {
   activeTripId: (value): value is TripId | null => value === null || typeof value === 'string',
   lastBackupAt: isTimestampOrNull,
+  lastPhotoBackupAt: isTimestampOrNull,
   coordFormat: (value): value is CoordFormat => value === 'decimal' || value === 'dms',
   decimalMark: (value): value is DecimalMark => value === 'point' || value === 'comma',
   accuracyTargetM: isPositiveNumber,

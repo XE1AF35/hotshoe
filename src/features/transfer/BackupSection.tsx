@@ -3,11 +3,10 @@ import { Sheet } from '../../app/Sheet.tsx';
 import { holdUpdates } from '../../app/updates.ts';
 import { useDb } from '../../db/DbProvider.tsx';
 import { StorageFullError } from '../../db/errors.ts';
-import { useBackupStatus } from '../../db/hooks.ts';
-import { setSetting } from '../../db/settings.ts';
-import { formatBytes, formatDeviceTime } from '../../lib/format.ts';
+import { formatBytes, formatCount, formatDeviceTime } from '../../lib/format.ts';
 import { saveFile } from '../../lib/share.ts';
 import type { CreatedBackup, ReadBackup, RestoreMode, RestorePreview } from './backup.ts';
+import { describePending, recordBackup, useBackupStatus } from './backupStatus.ts';
 
 const loadBackup = () => import('./backup.ts');
 
@@ -20,6 +19,7 @@ type MakeState =
 export function BackupSection() {
   const db = useDb();
   const status = useBackupStatus();
+  const pendingText = status ? describePending(status) : null;
   const includeId = useId();
   const [includePhotos, setIncludePhotos] = useState(true);
   const [make, setMake] = useState<MakeState>({ step: 'idle' });
@@ -48,7 +48,7 @@ export function BackupSection() {
     try {
       const result = await saveFile(backup.file);
       if (result === 'cancelled') return;
-      await setSetting(db, 'lastBackupAt', Date.now());
+      await recordBackup(db, backup);
       setMake({ step: 'saved' });
     } catch {
       setError("Couldn't share the backup. Try again.");
@@ -71,8 +71,7 @@ export function BackupSection() {
           {status.lastBackupAt === null
             ? 'No backup yet.'
             : `Last backup: ${formatDeviceTime(status.lastBackupAt)}.`}
-          {status.changed > 0 &&
-            ` ${count(status.changed, 'entry isn’t', 'entries aren’t')} backed up.`}
+          {pendingText !== null && ` ${pendingText}`}
         </p>
       )}
 
@@ -202,7 +201,7 @@ function RestoreControl() {
         message:
           result.entries === 0 && result.photos === 0
             ? 'Everything in the backup is already on this iPhone.'
-            : `Restored ${count(result.entries, 'entry', 'entries')} and ${count(result.photos, 'photo', 'photos')}.`,
+            : `Restored ${formatCount(result.entries, 'entry', 'entries')} and ${formatCount(result.photos, 'photo', 'photos')}.`,
       });
     } catch (caught) {
       setState({ step: 'idle' });
@@ -281,10 +280,11 @@ function RestoreForm({
   return (
     <div className="space-y-4">
       <p>
-        This backup has {count(preview.entries, 'entry', 'entries')},{' '}
-        {count(preview.trips, 'trip', 'trips')}, and {count(preview.photos, 'photo', 'photos')}.
+        This backup has {formatCount(preview.entries, 'entry', 'entries')},{' '}
+        {formatCount(preview.trips, 'trip', 'trips')}, and{' '}
+        {formatCount(preview.photos, 'photo', 'photos')}.
         {preview.alreadyPresent > 0 &&
-          ` ${count(preview.alreadyPresent, 'entry is', 'entries are')} already on this iPhone.`}
+          ` ${formatCount(preview.alreadyPresent, 'entry is', 'entries are')} already on this iPhone.`}
       </p>
       <fieldset className="space-y-1">
         <legend className="mb-1 font-medium text-sm">How to restore</legend>
@@ -364,8 +364,4 @@ function RestoreForm({
       )}
     </div>
   );
-}
-
-function count(value: number, one: string, many: string): string {
-  return `${value} ${value === 1 ? one : many}`;
 }

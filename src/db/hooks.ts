@@ -3,7 +3,7 @@ import { useDb } from './DbProvider.tsx';
 import { listEntries } from './entries.ts';
 import { listPhotos, totalPhotoBytes } from './photos.ts';
 import type { Entry, EntryId, Photo, Trip, TripId } from './schema.ts';
-import { getSetting, getSettings, type Settings } from './settings.ts';
+import { getSettings, type Settings } from './settings.ts';
 import { listTrips } from './trips.ts';
 
 /** All settings, kept up to date. Undefined while loading. */
@@ -60,22 +60,6 @@ export function usePhotoCounts(): Map<EntryId, number> | undefined {
       counts.set(entryId, (counts.get(entryId) ?? 0) + 1);
     });
     return counts;
-  }, [db]);
-}
-
-/** What has changed since the last backup. Undefined while loading. */
-export function useBackupStatus():
-  | { lastBackupAt: number | null; changed: number; oldestChangeAt: number | null }
-  | undefined {
-  const db = useDb();
-  return useLiveQuery(async () => {
-    const lastBackupAt = await getSetting(db, 'lastBackupAt');
-    const since = lastBackupAt ?? 0;
-    const [changed, oldest] = await Promise.all([
-      db.entries.where('updatedAt').above(since).count(),
-      db.entries.where('updatedAt').above(since).first(),
-    ]);
-    return { lastBackupAt, changed, oldestChangeAt: oldest?.updatedAt ?? null };
   }, [db]);
 }
 

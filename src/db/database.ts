@@ -39,5 +39,10 @@ export class HotshoeDb extends Dexie {
             trip.cameraClock ??= null;
           }),
       );
+    // Indexes when photos were added, so the backup status can find new ones without reading any
+    // images. Only an index is added, so no upgrade function is needed.
+    this.version(4).stores({
+      photos: 'id, entryId, [entryId+takenAt], bytes, createdAt',
+    });
   }
 }

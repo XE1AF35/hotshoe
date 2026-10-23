@@ -134,11 +134,6 @@ export function listEntries(db: HotshoeDb): Promise<Entry[]> {
   return db.entries.orderBy('loggedAt').reverse().toArray();
 }
 
-/** Entries added or edited after `since`, for the backup reminder. */
-export function countEntriesChangedSince(db: HotshoeDb, since: number): Promise<number> {
-  return db.entries.where('updatedAt').above(since).count();
-}
-
 async function assertTripExists(db: HotshoeDb, tripId: TripId | null): Promise<void> {
   if (tripId !== null && (await db.trips.get(tripId)) === undefined) {
     throw new MissingRecordError(`Trip ${tripId} does not exist.`);

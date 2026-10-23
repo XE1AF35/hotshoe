@@ -2,10 +2,11 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { DbProvider } from '../../db/DbProvider.tsx';
 import type { HotshoeDb } from '../../db/database.ts';
-import { listEntries } from '../../db/entries.ts';
+import { addEntry, listEntries } from '../../db/entries.ts';
+import { addPhoto } from '../../db/photos.ts';
 import { setSetting } from '../../db/settings.ts';
 import { addTrip } from '../../db/trips.ts';
-import { createTestDb } from '../../test/db.ts';
+import { createTestDb, jpegBlob, newEntryInput } from '../../test/db.ts';
 import { installFakeGeolocation } from '../../test/geolocation.ts';
 import { LogScreen } from './LogScreen.tsx';
 
@@ -200,5 +201,32 @@ describe('LogScreen', () => {
     await waitFor(() => expect(gps.watchers.size).toBe(1));
     act(() => gps.emit(8));
     expect(await screen.findByRole('heading', { name: 'Logged' })).toBeDefined();
+  });
+
+  it('reminds about a photo the last backup left out', async () => {
+    const db = createTestDb();
+    const day = 86_400_000;
+    const now = Date.now();
+    const entry = await addEntry(db, newEntryInput(), now - 10 * day);
+    await setSetting(db, 'lastPhotoBackupAt', now - 9 * day);
+    await addPhoto(
+      db,
+      {
+        entryId: entry.id,
+        takenAt: now - 8 * day,
+        source: 'camera',
+        image: jpegBlob(400),
+        thumb: jpegBlob(40),
+        width: 1600,
+        height: 1200,
+      },
+      now - 8 * day,
+    );
+    // A backup without photos since then.
+    await setSetting(db, 'lastBackupAt', now - day);
+    renderLogScreen(db);
+
+    const reminder = await screen.findByRole('complementary', { name: 'Backup reminder' });
+    expect(reminder.textContent).toContain('1 photo isn’t backed up yet.');
   });
 });

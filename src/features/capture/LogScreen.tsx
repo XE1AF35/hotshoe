@@ -70,7 +70,7 @@ function LogScreenBody({
 
   return (
     <>
-      <BackupReminder settings={settings} />
+      <BackupReminder />
       {state.status === 'failed' && <CaptureProblem reason={state.reason} />}
       {pendingPhotos.length > 0 && state.status !== 'locating' && state.status !== 'saving' && (
         <p role="status" className="rounded-2xl bg-warning p-4 text-on-warning text-sm">

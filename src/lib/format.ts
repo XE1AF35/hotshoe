@@ -83,3 +83,8 @@ export function formatBytes(bytes: number): string {
   if (bytes < 1e6) return `${Math.max(1, Math.round(bytes / 1e3))} KB`;
   return `${(bytes / 1e6).toFixed(1)} MB`;
 }
+
+/** `1 entry` or `3 entries`. */
+export function formatCount(value: number, one: string, many: string): string {
+  return `${value} ${value === 1 ? one : many}`;
+}
