@@ -19,7 +19,7 @@ export type FailReason =
   | 'storage-full'
   | 'save-error';
 
-export type CaptureState =
+type CaptureStep =
   | { readonly status: 'idle' }
   | {
       readonly status: 'locating';
@@ -30,8 +30,19 @@ export type CaptureState =
       readonly lastError: 'unavailable' | 'timeout' | null;
     }
   | { readonly status: 'saving'; readonly loggedAt: number; readonly fix: Fix }
-  | { readonly status: 'saved'; readonly entryId: EntryId }
+  | {
+      readonly status: 'saved';
+      readonly entryId: EntryId;
+      /** Photos handed over to this entry, including any that arrive after it saved. */
+      readonly photos: readonly File[];
+    }
   | { readonly status: 'failed'; readonly reason: FailReason };
+
+/**
+ * Photos from "Log with photo" wait for the next successful save. Camera photos taken in Hotshoe
+ * exist nowhere else, so cancelling or a failed fix keeps them waiting.
+ */
+export type CaptureState = CaptureStep & { readonly waiting: readonly File[] };
 
 export type CaptureEvent =
   | { readonly type: 'start'; readonly at: number; readonly supported: boolean }
@@ -41,13 +52,14 @@ export type CaptureEvent =
   | { readonly type: 'timeout' }
   | { readonly type: 'cancel' }
   | { readonly type: 'saved'; readonly entryId: EntryId }
-  | { readonly type: 'saveFailed'; readonly reason: 'storage-full' | 'save-error' };
+  | { readonly type: 'saveFailed'; readonly reason: 'storage-full' | 'save-error' }
+  | { readonly type: 'photosTaken'; readonly files: readonly File[] };
 
 /** GeolocationPositionError codes, which are fixed by the specification. */
 const permissionDenied = 1;
 const positionUnavailable = 2;
 
-export const initialCaptureState: CaptureState = { status: 'idle' };
+export const initialCaptureState: CaptureState = { status: 'idle', waiting: [] };
 
 /**
  * The capture flow as a pure function, so every path can be tested without a device.
@@ -58,25 +70,26 @@ export const initialCaptureState: CaptureState = { status: 'idle' };
  * count if the time limit passes with no fix at all.
  */
 export function captureReducer(state: CaptureState, event: CaptureEvent): CaptureState {
+  const { waiting } = state;
   switch (event.type) {
     case 'start':
       if (state.status === 'locating' || state.status === 'saving') return state;
       return event.supported
-        ? { status: 'locating', loggedAt: event.at, best: null, lastError: null }
-        : { status: 'failed', reason: 'unsupported' };
+        ? { status: 'locating', loggedAt: event.at, best: null, lastError: null, waiting }
+        : { status: 'failed', reason: 'unsupported', waiting };
 
     case 'position': {
       if (state.status !== 'locating') return state;
       const best =
         state.best === null || event.fix.accuracyM <= state.best.accuracyM ? event.fix : state.best;
       return best.accuracyM <= event.targetM
-        ? { status: 'saving', loggedAt: state.loggedAt, fix: best }
+        ? { status: 'saving', loggedAt: state.loggedAt, fix: best, waiting }
         : { ...state, best };
     }
 
     case 'positionError':
       if (state.status !== 'locating') return state;
-      if (event.code === permissionDenied) return { status: 'failed', reason: 'denied' };
+      if (event.code === permissionDenied) return { status: 'failed', reason: 'denied', waiting };
       return {
         ...state,
         lastError: event.code === positionUnavailable ? 'unavailable' : 'timeout',
@@ -84,22 +97,32 @@ export function captureReducer(state: CaptureState, event: CaptureEvent): Captur
 
     case 'accept':
       if (state.status !== 'locating' || state.best === null) return state;
-      return { status: 'saving', loggedAt: state.loggedAt, fix: state.best };
+      return { status: 'saving', loggedAt: state.loggedAt, fix: state.best, waiting };
 
     case 'timeout':
       if (state.status !== 'locating') return state;
       return state.best === null
-        ? { status: 'failed', reason: state.lastError ?? 'timeout' }
-        : { status: 'saving', loggedAt: state.loggedAt, fix: state.best };
+        ? { status: 'failed', reason: state.lastError ?? 'timeout', waiting }
+        : { status: 'saving', loggedAt: state.loggedAt, fix: state.best, waiting };
 
     case 'cancel':
-      return state.status === 'locating' ? { status: 'idle' } : state;
+      return state.status === 'locating' ? { status: 'idle', waiting } : state;
 
     case 'saved':
-      return state.status === 'saving' ? { status: 'saved', entryId: event.entryId } : state;
+      return state.status === 'saving'
+        ? { status: 'saved', entryId: event.entryId, photos: waiting, waiting: [] }
+        : state;
 
     case 'saveFailed':
-      return state.status === 'saving' ? { status: 'failed', reason: event.reason } : state;
+      return state.status === 'saving'
+        ? { status: 'failed', reason: event.reason, waiting }
+        : state;
+
+    case 'photosTaken':
+      // The camera can close after a quick fix has already saved: those photos are that entry's.
+      return state.status === 'saved'
+        ? { ...state, photos: [...state.photos, ...event.files] }
+        : { ...state, waiting: [...waiting, ...event.files] };
   }
 }
 

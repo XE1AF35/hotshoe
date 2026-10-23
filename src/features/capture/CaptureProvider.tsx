@@ -1,11 +1,24 @@
-import { useCallback, useEffect, useReducer, useRef, useSyncExternalStore } from 'react';
+import {
+  createContext,
+  type ReactNode,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from 'react';
 import { useHoldUpdates } from '../../app/updates.ts';
 import { useDb } from '../../db/DbProvider.tsx';
 import { addEntry } from '../../db/entries.ts';
 import { StorageFullError } from '../../db/errors.ts';
-import { getSetting, type Settings, setSetting } from '../../db/settings.ts';
+import { useSettings } from '../../db/SettingsProvider.tsx';
+import { getSetting, setSetting } from '../../db/settings.ts';
 import { requestPersistence } from '../../lib/storage.ts';
 import { captureTimeContext } from '../../lib/time.ts';
+import { attachPhotos, attachProblemMessage } from '../photos/attach.ts';
 import {
   type CaptureState,
   captureReducer,
@@ -13,19 +26,18 @@ import {
   initialCaptureState,
 } from './capture.ts';
 
-export interface CaptureOptions {
-  readonly settings: Pick<Settings, 'accuracyTargetM' | 'fixTimeoutS'>;
-  /** Injected for tests. */
-  readonly geolocation?: Geolocation | undefined;
-  readonly now?: () => number;
-}
-
 export interface Capture {
+  /** Includes the photos waiting for the next successful save. */
   readonly state: CaptureState;
+  /** How adding the photos to the saved entry went, if there were any. */
+  readonly photoMessage: string | null;
   readonly start: () => void;
   readonly accept: () => void;
   readonly cancel: () => void;
+  readonly addPhotos: (files: File[]) => void;
 }
+
+const CaptureContext = createContext<Capture | null>(null);
 
 function subscribeVisibility(onChange: () => void): () => void {
   document.addEventListener('visibilitychange', onChange);
@@ -34,22 +46,36 @@ function subscribeVisibility(onChange: () => void): () => void {
 
 const isVisible = () => document.visibilityState === 'visible';
 
-export function useCapture({
-  settings,
+/**
+ * Runs the capture flow above the tabs, so a Log in progress and the photos waiting for it
+ * survive switching tabs. It must sit inside a SettingsProvider.
+ */
+export function CaptureProvider({
   geolocation = typeof navigator === 'undefined' ? undefined : navigator.geolocation,
   now = Date.now,
-}: CaptureOptions): Capture {
+  children,
+}: {
+  /** Injected for tests. */
+  readonly geolocation?: Geolocation | undefined;
+  readonly now?: () => number;
+  readonly children: ReactNode;
+}) {
   const db = useDb();
+  const { accuracyTargetM, fixTimeoutS, photoQuality } = useSettings();
   const [state, dispatch] = useReducer(captureReducer, initialCaptureState);
-  useHoldUpdates(state.status === 'locating' || state.status === 'saving');
+  const [photoMessage, setPhotoMessage] = useState<string | null>(null);
+  useHoldUpdates(
+    state.status === 'locating' || state.status === 'saving' || state.waiting.length > 0,
+  );
   const visible = useSyncExternalStore(subscribeVisibility, isVisible);
-  const { accuracyTargetM, fixTimeoutS } = settings;
 
   const start = useCallback(() => {
+    setPhotoMessage(null);
     dispatch({ type: 'start', at: now(), supported: geolocation !== undefined });
   }, [geolocation, now]);
   const accept = useCallback(() => dispatch({ type: 'accept' }), []);
   const cancel = useCallback(() => dispatch({ type: 'cancel' }), []);
+  const addPhotos = useCallback((files: File[]) => dispatch({ type: 'photosTaken', files }), []);
 
   // Watch the position while locating. iOS suspends hidden apps, so the watch stops when the app
   // is hidden and starts afresh, with a fresh time limit, when it comes back.
@@ -92,7 +118,30 @@ export function useCapture({
     })();
   }, [state, db]);
 
-  return { state, start, accept, cancel };
+  // Attach each photo handed over to the saved entry once, including any that arrive later.
+  const attached = useRef(new WeakSet<File>());
+  useEffect(() => {
+    if (state.status !== 'saved') return;
+    const files = state.photos.filter((file) => !attached.current.has(file));
+    if (files.length === 0) return;
+    for (const file of files) attached.current.add(file);
+    setPhotoMessage('Adding photo…');
+    attachPhotos(db, state.entryId, files, photoQuality, 'camera')
+      .then((result) => setPhotoMessage(attachProblemMessage(result.problem)))
+      .catch(() => setPhotoMessage("Couldn't add the photo."));
+  }, [state, db, photoQuality]);
+
+  const capture = useMemo(
+    () => ({ state, photoMessage, start, accept, cancel, addPhotos }),
+    [state, photoMessage, start, accept, cancel, addPhotos],
+  );
+  return <CaptureContext value={capture}>{children}</CaptureContext>;
+}
+
+export function useCapture(): Capture {
+  const capture = useContext(CaptureContext);
+  if (!capture) throw new Error('useCapture must be used inside a CaptureProvider');
+  return capture;
 }
 
 /** After the first save, ask iOS to keep the data. Asked once, and the answer is kept for display. */

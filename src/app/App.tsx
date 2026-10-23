@@ -1,5 +1,6 @@
 import { type ComponentType, lazy, Suspense } from 'react';
 import { SettingsProvider } from '../db/SettingsProvider.tsx';
+import { CaptureProvider } from '../features/capture/CaptureProvider.tsx';
 import { LogScreen } from '../features/capture/LogScreen.tsx';
 import { InstallBanner } from './InstallBanner.tsx';
 import { type Tab, useTab } from './router.ts';
@@ -33,9 +34,12 @@ export function App() {
         <main className="mx-auto flex w-full max-w-xl flex-1 flex-col px-4 pt-[max(1rem,env(safe-area-inset-top))] pb-6">
           {/* Inside the content, so the tab bar paints without waiting for Settings to load. */}
           <SettingsProvider>
-            <Suspense fallback={null}>
-              <Screen />
-            </Suspense>
+            {/* Above the tabs, so a Log in progress and its waiting photos survive switching. */}
+            <CaptureProvider>
+              <Suspense fallback={null}>
+                <Screen />
+              </Suspense>
+            </CaptureProvider>
           </SettingsProvider>
         </main>
       </div>

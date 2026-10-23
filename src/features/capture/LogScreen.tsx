@@ -1,21 +1,18 @@
-import { type ReactNode, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import { CameraIcon, CheckIcon, CloseIcon, PinIcon } from '../../app/icons.tsx';
 import { ScreenHeader } from '../../app/ScreenHeader.tsx';
-import { useHoldUpdates } from '../../app/updates.ts';
-import { useDb } from '../../db/DbProvider.tsx';
 import { useLatestEntry } from '../../db/hooks.ts';
 import { useSettings } from '../../db/SettingsProvider.tsx';
 import type { Entry } from '../../db/schema.ts';
 import { coordStyleOf } from '../../db/settings.ts';
 import { formatAccuracy } from '../../lib/format.ts';
-import { attachPhotos, attachProblemMessage } from '../photos/attach.ts';
 import { usePhotoInputs } from '../photos/usePhotoInputs.tsx';
 import { BackupReminder } from '../transfer/BackupReminder.tsx';
 import { ActiveTripPicker } from '../trips/ActiveTripPicker.tsx';
 import { CaptureProblem } from './CaptureProblem.tsx';
+import { useCapture } from './CaptureProvider.tsx';
 import { type CaptureState, fixProgress } from './capture.ts';
 import { EntryCard } from './EntryCard.tsx';
-import { useCapture } from './useCapture.ts';
 
 export function LogScreen() {
   const latest = useLatestEntry();
@@ -31,32 +28,14 @@ export function LogScreen() {
 }
 
 function LogScreenBody({ latest }: { readonly latest: Entry | null }) {
-  const db = useDb();
   const settings = useSettings();
-  const capture = useCapture({ settings });
-  const { state } = capture;
+  const capture = useCapture();
+  const { state, photoMessage } = capture;
   const justSaved = state.status === 'saved' && latest?.id === state.entryId;
-
-  // Photos from "Log with photo" wait here until their entry is saved. If the fix fails they keep
-  // waiting for the next successful log, since camera photos taken here are not in Photos.
-  const [pendingPhotos, setPendingPhotos] = useState<File[]>([]);
-  const [photoMessage, setPhotoMessage] = useState<string | null>(null);
-  const camera = usePhotoInputs((files) => setPendingPhotos((waiting) => [...waiting, ...files]));
-  useHoldUpdates(pendingPhotos.length > 0);
-
-  const savedEntryId = state.status === 'saved' ? state.entryId : null;
-  useEffect(() => {
-    if (savedEntryId === null || pendingPhotos.length === 0) return;
-    const files = pendingPhotos;
-    setPendingPhotos([]);
-    setPhotoMessage('Adding photo…');
-    attachPhotos(db, savedEntryId, files, settings.photoQuality, 'camera')
-      .then((result) => setPhotoMessage(attachProblemMessage(result.problem)))
-      .catch(() => setPhotoMessage("Couldn't add the photo."));
-  }, [savedEntryId, pendingPhotos, db, settings.photoQuality]);
+  // The camera input stays here, since iOS only opens the camera straight from a tap.
+  const camera = usePhotoInputs(capture.addPhotos);
 
   function startWithPhoto() {
-    setPhotoMessage(null);
     capture.start();
     camera.openCamera();
   }
@@ -65,7 +44,7 @@ function LogScreenBody({ latest }: { readonly latest: Entry | null }) {
     <>
       <BackupReminder />
       {state.status === 'failed' && <CaptureProblem reason={state.reason} />}
-      {pendingPhotos.length > 0 && state.status !== 'locating' && state.status !== 'saving' && (
+      {state.waiting.length > 0 && state.status !== 'locating' && state.status !== 'saving' && (
         <p role="status" className="rounded-2xl bg-warning p-4 text-on-warning text-sm">
           Your photo is waiting. Tap Log location and it will be added to that entry.
         </p>

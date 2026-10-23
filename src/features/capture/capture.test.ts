@@ -33,6 +33,7 @@ describe('captureReducer', () => {
       loggedAt: 500,
       best: null,
       lastError: null,
+      waiting: [],
     });
   });
 
@@ -40,6 +41,7 @@ describe('captureReducer', () => {
     expect(run([{ type: 'start', at: 500, supported: false }])).toEqual({
       status: 'failed',
       reason: 'unsupported',
+      waiting: [],
     });
   });
 
@@ -53,6 +55,7 @@ describe('captureReducer', () => {
       status: 'saving',
       loggedAt: 500,
       fix: fix(12),
+      waiting: [],
     });
   });
 
@@ -75,13 +78,18 @@ describe('captureReducer', () => {
   });
 
   it('fails at the time limit when no fix arrived', () => {
-    expect(run([start, { type: 'timeout' }])).toEqual({ status: 'failed', reason: 'timeout' });
+    expect(run([start, { type: 'timeout' }])).toEqual({
+      status: 'failed',
+      reason: 'timeout',
+      waiting: [],
+    });
   });
 
   it('fails at once when permission is refused', () => {
     expect(run([start, position(300), { type: 'positionError', code: 1 }])).toEqual({
       status: 'failed',
       reason: 'denied',
+      waiting: [],
     });
   });
 
@@ -91,12 +99,16 @@ describe('captureReducer', () => {
     expect(run([{ type: 'timeout' }], afterError)).toEqual({
       status: 'failed',
       reason: 'unavailable',
+      waiting: [],
     });
     expect(run([position(10)], afterError)).toMatchObject({ status: 'saving' });
   });
 
   it('goes back to idle on cancel', () => {
-    expect(run([start, position(300), { type: 'cancel' }])).toEqual({ status: 'idle' });
+    expect(run([start, position(300), { type: 'cancel' }])).toEqual({
+      status: 'idle',
+      waiting: [],
+    });
   });
 
   it('ignores a second start while busy', () => {
@@ -107,16 +119,27 @@ describe('captureReducer', () => {
   it('records the saved entry, or why saving failed', () => {
     const saving = run([start, position(5)]);
     const entryId = 'entry-1' as EntryId;
-    expect(run([{ type: 'saved', entryId }], saving)).toEqual({ status: 'saved', entryId });
+    expect(run([{ type: 'saved', entryId }], saving)).toEqual({
+      status: 'saved',
+      entryId,
+      photos: [],
+      waiting: [],
+    });
     expect(run([{ type: 'saveFailed', reason: 'storage-full' }], saving)).toEqual({
       status: 'failed',
       reason: 'storage-full',
+      waiting: [],
     });
   });
 
   it('can start again after saving or failing', () => {
-    const saved: CaptureState = { status: 'saved', entryId: 'e' as EntryId };
-    const failed: CaptureState = { status: 'failed', reason: 'timeout' };
+    const saved: CaptureState = {
+      status: 'saved',
+      entryId: 'e' as EntryId,
+      photos: [],
+      waiting: [],
+    };
+    const failed: CaptureState = { status: 'failed', reason: 'timeout', waiting: [] };
     expect(run([start], saved)).toMatchObject({ status: 'locating' });
     expect(run([start], failed)).toMatchObject({ status: 'locating' });
   });
@@ -124,6 +147,63 @@ describe('captureReducer', () => {
   it('ignores late positions after saving has begun', () => {
     const saving = run([start, position(5)]);
     expect(run([position(1)], saving)).toBe(saving);
+  });
+});
+
+describe('captureReducer with photos', () => {
+  const photo = (name: string) => new File(['jpeg'], name, { type: 'image/jpeg' });
+  const first = photo('first.jpg');
+  const second = photo('second.jpg');
+  const taken = (...files: File[]): CaptureEvent => ({ type: 'photosTaken', files });
+
+  it('keeps photos waiting while locating, adding each batch to the list', () => {
+    expect(run([start, taken(first), taken(second)])).toMatchObject({
+      status: 'locating',
+      waiting: [first, second],
+    });
+  });
+
+  it('keeps them waiting through a cancel, a failed fix, or a failed save', () => {
+    expect(run([start, taken(first), { type: 'cancel' }])).toEqual({
+      status: 'idle',
+      waiting: [first],
+    });
+    expect(run([start, taken(first), { type: 'positionError', code: 1 }])).toEqual({
+      status: 'failed',
+      reason: 'denied',
+      waiting: [first],
+    });
+    expect(
+      run([start, taken(first), position(5), { type: 'saveFailed', reason: 'save-error' }]),
+    ).toEqual({ status: 'failed', reason: 'save-error', waiting: [first] });
+  });
+
+  it('carries them into the next log after a failure', () => {
+    const failed = run([start, taken(first), { type: 'timeout' }]);
+    expect(run([start, taken(second)], failed)).toMatchObject({
+      status: 'locating',
+      waiting: [first, second],
+    });
+  });
+
+  it('hands them over to the entry once it saves', () => {
+    const entryId = 'entry-1' as EntryId;
+    expect(run([start, taken(first), position(5), { type: 'saved', entryId }])).toEqual({
+      status: 'saved',
+      entryId,
+      photos: [first],
+      waiting: [],
+    });
+  });
+
+  it('gives photos that arrive after a quick save to that entry', () => {
+    const entryId = 'entry-1' as EntryId;
+    expect(run([start, position(5), { type: 'saved', entryId }, taken(first)])).toEqual({
+      status: 'saved',
+      entryId,
+      photos: [first],
+      waiting: [],
+    });
   });
 });
 
