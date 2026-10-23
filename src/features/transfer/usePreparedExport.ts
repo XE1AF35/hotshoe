@@ -1,71 +1,97 @@
-import { useEffect, useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { useMemo, useState } from 'react';
 import { holdUpdates } from '../../app/updates.ts';
 import { useDb } from '../../db/DbProvider.tsx';
+import type { CameraClock } from '../../db/schema.ts';
 import { saveFile } from '../../lib/share.ts';
-import type { CreatedExport, ExportScope } from './exportFile.ts';
+// Imported up front, not lazily, because the live read has to start as soon as the hook does.
+import {
+  buildExport,
+  type CameraTimeChoice,
+  type CreatedExport,
+  cameraClockFor,
+  type ExportScope,
+  readExportSource,
+} from './exportFile.ts';
 import type { ExportFormat } from './formats.ts';
-
-const loadExporter = () => import('./exportFile.ts');
 
 /**
  * An export file made ahead of the tap that shares it: iOS only opens the share sheet straight
- * from a tap, so there is no time to read the database in between. The file is remade when the
- * format, the scope, or `changes` (the entries, say) change.
+ * from a tap, so there is no time to read the database in between. The rows are read live, so the
+ * file is remade whenever anything it holds changes, or the format or camera time choice does.
  */
 export function usePreparedExport(
   format: ExportFormat,
   scope: ExportScope,
-  changes: unknown,
-  /** Minutes from UTC set in the photo software, to match a camera clock, or null for UTC. */
-  softwareUtcOffsetMin: number | null = null,
-) {
+  cameraTime: CameraTimeChoice = null,
+): {
+  readonly ready: CreatedExport | null;
+  /** The clock the file can be matched to, so the choice is only offered when there is one. */
+  readonly cameraClock: CameraClock | null;
+  readonly message: string | null;
+  readonly error: string | null;
+  readonly share: () => Promise<void>;
+} {
   const db = useDb();
-  const [ready, setReady] = useState<CreatedExport | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
   // A picked set is a new array on every render, so it is compared by its ids.
   const scopeKey = typeof scope === 'object' ? scope.entryIds.join(',') : scope;
-
-  // biome-ignore lint/correctness/useExhaustiveDependencies: scopeKey stands in for scope.
-  useEffect(() => {
-    if (changes === undefined) return;
-    let current = true;
-    setReady(null);
-    setError(null);
-    setMessage(null);
-    loadExporter()
-      .then(({ createExport }) =>
-        createExport(db, {
-          format,
-          scope,
-          cameraTime: softwareUtcOffsetMin === null ? null : { softwareUtcOffsetMin },
-        }),
-      )
-      .then((created) => {
-        if (current) setReady(created);
-      })
-      .catch(() => {
-        if (current) setError("Couldn't prepare the export. Try again.");
+  // Undefined while loading, null when the read failed.
+  const source = useLiveQuery(
+    () => readExportSource(db, scope).catch(() => null),
+    // scopeKey stands in for scope.
+    [db, scopeKey],
+  );
+  // Callers pass a new object each render, so the choice is memoised by its parts.
+  const zone = cameraTime?.softwareUtcOffsetMin ?? null;
+  const matchCamera = cameraTime !== null;
+  // Undefined while loading, null when the read or the build failed.
+  const ready = useMemo(() => {
+    if (!source) return source;
+    try {
+      return buildExport(source, {
+        format,
+        cameraTime: matchCamera ? { softwareUtcOffsetMin: zone } : null,
       });
-    return () => {
-      current = false;
-    };
-  }, [db, format, scopeKey, changes, softwareUtcOffsetMin]);
+    } catch {
+      return null;
+    }
+  }, [source, format, matchCamera, zone]);
+  // What sharing said, kept with the file it was about so a remade file starts afresh.
+  const [outcome, setOutcome] = useState<{
+    readonly sharedFile: CreatedExport;
+    readonly message: string | null;
+    readonly error: string | null;
+  } | null>(null);
+  const readyOutcome = ready && outcome?.sharedFile === ready ? outcome : null;
 
   async function share() {
     if (!ready) return;
-    setError(null);
-    setMessage(null);
+    setOutcome(null);
     const release = holdUpdates();
     try {
       const result = await saveFile(ready.file);
-      if (result !== 'cancelled') setMessage(`Exported ${ready.file.name}.`);
+      setOutcome({
+        sharedFile: ready,
+        message: result === 'cancelled' ? null : `Exported ${ready.file.name}.`,
+        error: null,
+      });
     } catch {
-      setError("Couldn't share the export. Try again.");
+      setOutcome({
+        sharedFile: ready,
+        message: null,
+        error: "Couldn't share the export. Try again.",
+      });
     } finally {
       release();
     }
   }
 
-  return { ready, message, error, share };
+  return {
+    ready: ready ?? null,
+    cameraClock: source ? cameraClockFor(source, format) : null,
+    message: readyOutcome?.message ?? null,
+    error:
+      ready === null ? "Couldn't prepare the export. Try again." : (readyOutcome?.error ?? null),
+    share,
+  };
 }

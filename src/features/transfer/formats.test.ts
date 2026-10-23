@@ -42,7 +42,7 @@ const rows: ExportRow[] = [
       label: 'Onetangi, "golden hour"\nsecond line',
       tripId: waiheke,
     }),
-    tripName: 'Waiheke & <Rakino>',
+    trip: { id: waiheke, name: 'Waiheke & <Rakino>' },
     photoIds: [],
   },
   {
@@ -53,7 +53,7 @@ const rows: ExportRow[] = [
       frame: '12A',
       tripId: waiheke,
     }),
-    tripName: 'Waiheke & <Rakino>',
+    trip: { id: waiheke, name: 'Waiheke & <Rakino>' },
     photoIds: ['p1' as PhotoId, 'p2' as PhotoId],
   },
   {
@@ -64,7 +64,7 @@ const rows: ExportRow[] = [
       label: '=HYPERLINK("http://example.com")',
       frame: '-3',
     }),
-    tripName: null,
+    trip: null,
     photoIds: [],
   },
 ];

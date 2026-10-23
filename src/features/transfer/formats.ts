@@ -4,26 +4,51 @@
  * entries oldest first, and rounds coordinates to six decimal places.
  */
 
-import type { CameraClock, Entry, PhotoId } from '../../db/schema.ts';
+import type { CameraClock, Entry, PhotoId, TripId } from '../../db/schema.ts';
 import { formatDegrees } from '../../lib/coords.ts';
 import { formatLocalIso, formatUtcIso, formatUtcOffset, localDayKey } from '../../lib/time.ts';
 import { toCameraTime } from '../trips/cameraClock.ts';
 
-export type ExportFormat = 'csv' | 'geojson' | 'gpx';
+/** The formats in the order they are offered, GPX first as it is what Hotshoe is for. */
+export const exportFormats = [
+  {
+    value: 'gpx',
+    title: 'GPX',
+    detail: 'For geotagging in Lightroom, darktable, or digiKam.',
+    extension: 'gpx',
+    mimeType: 'application/gpx+xml',
+  },
+  {
+    value: 'csv',
+    title: 'CSV',
+    detail: 'For spreadsheets.',
+    extension: 'csv',
+    mimeType: 'text/csv',
+  },
+  {
+    value: 'geojson',
+    title: 'GeoJSON',
+    detail: 'For maps and GIS apps.',
+    extension: 'geojson',
+    mimeType: 'application/geo+json',
+  },
+] as const;
+
+export type ExportFormat = (typeof exportFormats)[number]['value'];
+
+export function formatDetails(format: ExportFormat): (typeof exportFormats)[number] {
+  const details = exportFormats.find(({ value }) => value === format);
+  if (!details) throw new Error(`Unknown export format: ${format}`);
+  return details;
+}
 
 /** An entry with the details exports need from other tables. */
 export interface ExportRow {
   readonly entry: Entry;
-  /** null when the entry has no trip. */
-  readonly tripName: string | null;
+  /** null when the entry has no trip. Names can repeat, so tracks are told apart by id. */
+  readonly trip: { readonly id: TripId; readonly name: string } | null;
   readonly photoIds: readonly PhotoId[];
 }
-
-export const formatDetails: Record<ExportFormat, { extension: string; mimeType: string }> = {
-  csv: { extension: 'csv', mimeType: 'text/csv' },
-  geojson: { extension: 'geojson', mimeType: 'application/geo+json' },
-  gpx: { extension: 'gpx', mimeType: 'application/gpx+xml' },
-};
 
 export interface ExportOptions {
   /** GPX only: match times to this camera clock, so drift and a wrong time zone don't matter. */
@@ -95,7 +120,7 @@ function toCsv(rows: readonly ExportRow[]): string {
         entry.altitudeM === null ? '' : String(metres(entry.altitudeM)),
         textCell(entry.label),
         textCell(entry.frame),
-        textCell(row.tripName),
+        textCell(row.trip?.name ?? null),
         photoFileNames(row).join(' '),
       ]
         .map(csvField)
@@ -140,7 +165,7 @@ function toGeoJson(rows: readonly ExportRow[]): string {
         altitude_m: entry.altitudeM === null ? null : metres(entry.altitudeM),
         label: entry.label,
         frame: entry.frame,
-        trip: row.tripName,
+        trip: row.trip?.name ?? null,
         photos: photoFileNames(row),
       },
     };
@@ -168,11 +193,12 @@ function toGpx(
         ? toCameraTime(entry.loggedAt, cameraClock) - softwareUtcOffsetMin * 60_000
         : entry.loggedAt,
     );
-  const trips = new Map<string | null, ExportRow[]>();
+  const trips = new Map<TripId | null, ExportRow[]>();
   for (const row of rows) {
-    const group = trips.get(row.tripName);
+    const id = row.trip?.id ?? null;
+    const group = trips.get(id);
     if (group) group.push(row);
-    else trips.set(row.tripName, [row]);
+    else trips.set(id, [row]);
   }
 
   const lines = [
@@ -190,8 +216,9 @@ function toGpx(
     );
   }
 
-  for (const [tripName, tripRows] of trips) {
-    lines.push('  <trk>', `    <name>${xml(tripName ?? 'No trip')}</name>`);
+  for (const tripRows of trips.values()) {
+    const tripName = tripRows[0]?.trip?.name ?? 'No trip';
+    lines.push('  <trk>', `    <name>${xml(tripName)}</name>`);
     let day: string | null = null;
     for (const { entry } of tripRows) {
       const entryDay = localDayKey(entry.loggedAt, entry);

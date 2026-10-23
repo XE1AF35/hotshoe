@@ -104,7 +104,6 @@ export function EntriesScreen() {
         <SelectionBar
           picked={picked}
           total={entries.length}
-          changes={entries}
           onSelectAll={() => setPicked(new Set(entries.map((entry) => entry.id)))}
           onSelectNone={() => setPicked(new Set())}
         />

@@ -1,5 +1,5 @@
 import type { HotshoeDb } from '../../db/database.ts';
-import type { Entry, EntryId, PhotoId, TripId } from '../../db/schema.ts';
+import type { CameraClock, Entry, EntryId, PhotoId, TripId } from '../../db/schema.ts';
 import { fileDateStamp } from '../../lib/time.ts';
 import { type ExportFormat, type ExportRow, formatDetails, formatExport } from './formats.ts';
 
@@ -11,24 +11,29 @@ export interface CreatedExport {
   readonly entries: number;
 }
 
-export async function createExport(
-  db: HotshoeDb,
-  {
-    format,
-    scope,
-    cameraTime = null,
-    now = Date.now(),
-  }: {
-    readonly format: ExportFormat;
-    readonly scope: ExportScope;
-    /**
-     * For a trip with a measured camera clock: match GPX times to that camera, for photo software
-     * set to this time zone (minutes from UTC). Null leaves times in plain UTC.
-     */
-    readonly cameraTime?: { readonly softwareUtcOffsetMin: number } | null;
-    readonly now?: number;
-  },
-): Promise<CreatedExport> {
+/** What an export is made from, read in one go so a live query can watch exactly that. */
+export interface ExportSource {
+  readonly rows: readonly ExportRow[];
+  /** Goes in the file name: `all`, `selection`, or the trip's name as a slug. */
+  readonly scopeName: string;
+  /** The camera clock of the one trip being exported, if it has been measured. */
+  readonly tripCameraClock: CameraClock | null;
+}
+
+/**
+ * Matching GPX times to a trip's camera clock, for photo software set to this time zone (minutes
+ * from UTC). A null zone is the one the clock was measured in, which is what most people already
+ * enter. Null instead of the choice leaves times in plain UTC.
+ */
+export type CameraTimeChoice = { readonly softwareUtcOffsetMin: number | null } | null;
+
+/** The zone photo software is set to for a clock: the one chosen, or where it was measured. */
+export function softwareZone(chosen: number | null, clock: CameraClock | null): number {
+  return chosen ?? clock?.phoneUtcOffsetMin ?? 0;
+}
+
+/** Reads the entries in scope with their trips and photo ids. */
+export async function readExportSource(db: HotshoeDb, scope: ExportScope): Promise<ExportSource> {
   const [trips, entries, photoIds] = await db.transaction(
     'r',
     db.trips,
@@ -36,37 +41,65 @@ export async function createExport(
     db.photos,
     () => Promise.all([db.trips.toArray(), entriesInScope(db, scope), photoIdsByEntry(db)]),
   );
-  const tripNames = new Map(trips.map((trip) => [trip.id, trip.name]));
-  const rows: ExportRow[] = entries.map((entry) => ({
-    entry,
-    tripName: entry.tripId === null ? null : (tripNames.get(entry.tripId) ?? null),
-    photoIds: photoIds.get(entry.id) ?? [],
-  }));
+  const tripsById = new Map(trips.map((trip) => [trip.id, trip]));
+  const rows: ExportRow[] = entries.map((entry) => {
+    const trip = entry.tripId === null ? undefined : tripsById.get(entry.tripId);
+    return {
+      entry,
+      trip: trip ? { id: trip.id, name: trip.name } : null,
+      photoIds: photoIds.get(entry.id) ?? [],
+    };
+  });
+  const scopeTrip = typeof scope === 'string' && scope !== 'all' ? tripsById.get(scope) : undefined;
+  return {
+    rows,
+    scopeName:
+      scope === 'all'
+        ? 'all'
+        : typeof scope === 'object'
+          ? 'selection'
+          : slug(scopeTrip?.name ?? 'trip'),
+    tripCameraClock: scopeTrip?.cameraClock ?? null,
+  };
+}
 
-  const cameraClock =
-    cameraTime !== null && format === 'gpx' && typeof scope === 'string' && scope !== 'all'
-      ? (trips.find((trip) => trip.id === scope)?.cameraClock ?? null)
-      : null;
-  const { extension, mimeType } = formatDetails[format];
-  const scopeName =
-    scope === 'all'
-      ? 'all'
-      : typeof scope === 'object'
-        ? 'selection'
-        : slug(tripNames.get(scope) ?? 'trip');
-  const name = `hotshoe-${scopeName}-${fileDateStamp(now)}${cameraClock ? '-camera-time' : ''}.${extension}`;
+/**
+ * The camera clock an export can match its times to: only GPX of a single trip with a measured
+ * clock, since that is what photo software geotags from. Null otherwise.
+ */
+export function cameraClockFor(source: ExportSource, format: ExportFormat): CameraClock | null {
+  return format === 'gpx' ? source.tripCameraClock : null;
+}
+
+/** Makes the file to share. Pure, so it can be remade whenever the source or the choices change. */
+export function buildExport(
+  source: ExportSource,
+  {
+    format,
+    cameraTime = null,
+    now = Date.now(),
+  }: {
+    readonly format: ExportFormat;
+    /** Applies only where `cameraClockFor` finds a clock. */
+    readonly cameraTime?: CameraTimeChoice;
+    readonly now?: number;
+  },
+): CreatedExport {
+  const cameraClock = cameraTime === null ? null : cameraClockFor(source, format);
+  const { extension, mimeType } = formatDetails(format);
+  const name = `hotshoe-${source.scopeName}-${fileDateStamp(now)}${cameraClock ? '-camera-time' : ''}.${extension}`;
   return {
     file: new File(
       [
-        formatExport(format, rows, now, {
+        formatExport(format, source.rows, now, {
           cameraClock,
-          softwareUtcOffsetMin: cameraTime?.softwareUtcOffsetMin ?? 0,
+          softwareUtcOffsetMin: softwareZone(cameraTime?.softwareUtcOffsetMin ?? null, cameraClock),
         }),
       ],
       name,
       { type: mimeType },
     ),
-    entries: rows.length,
+    entries: source.rows.length,
   };
 }
 

@@ -1,29 +1,25 @@
 import { useId, useMemo, useState } from 'react';
 import { ShareIcon } from '../../app/icons.tsx';
 import type { EntryId } from '../../db/schema.ts';
-import { exportFormats } from '../transfer/ExportSection.tsx';
-import type { ExportFormat } from '../transfer/formats.ts';
+import { type ExportFormat, exportFormats } from '../transfer/formats.ts';
 import { usePreparedExport } from '../transfer/usePreparedExport.ts';
 
 /** Stays at the bottom of the list while picking entries, ready to export just those. */
 export function SelectionBar({
   picked,
   total,
-  changes,
   onSelectAll,
   onSelectNone,
 }: {
   readonly picked: ReadonlySet<EntryId>;
   readonly total: number;
-  /** The entries, so the export is remade when one is edited. */
-  readonly changes: unknown;
   readonly onSelectAll: () => void;
   readonly onSelectNone: () => void;
 }) {
   const formatId = useId();
   const [format, setFormat] = useState<ExportFormat>('gpx');
   const entryIds = useMemo(() => [...picked].sort(), [picked]);
-  const { ready, message, error, share } = usePreparedExport(format, { entryIds }, changes);
+  const { ready, message, error, share } = usePreparedExport(format, { entryIds });
   const count = picked.size;
 
   return (

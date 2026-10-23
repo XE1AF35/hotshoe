@@ -1,18 +1,12 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import { ShareIcon } from '../../app/icons.tsx';
 import { useEntries, useTripEntryCounts, useTrips } from '../../db/hooks.ts';
 import type { TripId } from '../../db/schema.ts';
 import { formatUtcOffset } from '../../lib/time.ts';
 import { describeCameraClock, utcOffsetChoices } from '../trips/cameraClock.ts';
-import type { ExportFormat } from './formats.ts';
+import { softwareZone as zoneFor } from './exportFile.ts';
+import { type ExportFormat, exportFormats } from './formats.ts';
 import { usePreparedExport } from './usePreparedExport.ts';
-
-export const exportFormats: ReadonlyArray<{ value: ExportFormat; title: string; detail: string }> =
-  [
-    { value: 'gpx', title: 'GPX', detail: 'For geotagging in Lightroom, darktable, or digiKam.' },
-    { value: 'csv', title: 'CSV', detail: 'For spreadsheets.' },
-    { value: 'geojson', title: 'GeoJSON', detail: 'For maps and GIS apps.' },
-  ];
 
 export function ExportSection() {
   const entries = useEntries();
@@ -25,24 +19,13 @@ export function ExportSection() {
   const [chosenZone, setChosenZone] = useState<number | null>(null);
   const cameraTimeId = useId();
   const zoneId = useId();
-  const clock =
-    scope === 'all' ? null : (trips?.find((trip) => trip.id === scope)?.cameraClock ?? null);
-  const offerCameraTime = clock !== null && format === 'gpx';
-  // The zone most people already enter in their photo software: where they were when they
-  // measured the clock.
-  const softwareZone = chosenZone ?? clock?.phoneUtcOffsetMin ?? 0;
-  const zoneChoices = [...new Set([...utcOffsetChoices, softwareZone])].sort((a, b) => a - b);
-  // Remade when entries or trips change, such as a newly measured camera clock.
-  const changes = useMemo(
-    () => (entries && trips ? [entries, trips] : undefined),
-    [entries, trips],
-  );
-  const { ready, message, error, share } = usePreparedExport(
+  const { ready, cameraClock, message, error, share } = usePreparedExport(
     format,
     scope,
-    changes,
-    offerCameraTime && cameraTime ? softwareZone : null,
+    cameraTime ? { softwareUtcOffsetMin: chosenZone } : null,
   );
+  const softwareZone = zoneFor(chosenZone, cameraClock);
+  const zoneChoices = [...new Set([...utcOffsetChoices, softwareZone])].sort((a, b) => a - b);
 
   // A trip that has been deleted can't be exported, so fall back to everything.
   useEffect(() => {
@@ -103,7 +86,7 @@ export function ExportSection() {
           ))}
         </fieldset>
 
-        {offerCameraTime && (
+        {cameraClock !== null && (
           <div className="space-y-3">
             <label htmlFor={cameraTimeId} className="flex min-h-11 items-start gap-3 px-3">
               <input
@@ -115,7 +98,7 @@ export function ExportSection() {
               />
               <span>
                 Match this trip's camera clock
-                <span className="block text-muted text-sm">{describeCameraClock(clock)}</span>
+                <span className="block text-muted text-sm">{describeCameraClock(cameraClock)}</span>
               </span>
             </label>
             {cameraTime && (
@@ -132,7 +115,7 @@ export function ExportSection() {
                   {zoneChoices.map((minutes) => (
                     <option key={minutes} value={minutes}>
                       {formatUtcOffset(minutes)}
-                      {minutes === clock.phoneUtcOffsetMin ? ' (this iPhone)' : ''}
+                      {minutes === cameraClock.phoneUtcOffsetMin ? ' (this iPhone)' : ''}
                     </option>
                   ))}
                 </select>
