@@ -24,13 +24,12 @@ describe('formatLoggedTime', () => {
   });
 
   it.each([
-    [780, '2:05:09', '(UTC+13:00)'],
-    [345, '6:50:09', '(UTC+05:45)'],
-    [0, '1:05:09', '(UTC)'],
-  ])('falls back to the recorded offset %d for an unknown zone', (utcOffsetMin, clock, label) => {
-    const text = formatLoggedTime(instant, { timeZone: 'Mars/Base', utcOffsetMin });
-    expect(text).toContain(clock);
-    expect(text).toContain(label);
+    [780, 'Wed, 14 Oct, 2:05:09 pm (UTC+13:00)'],
+    [330, 'Wed, 14 Oct, 6:35:09 am (UTC+05:30)'],
+    [0, 'Wed, 14 Oct, 1:05:09 am (UTC)'],
+    [-210, 'Tue, 13 Oct, 9:35:09 pm (UTC-03:30)'],
+  ])('falls back to the recorded offset %d for an unknown zone', (utcOffsetMin, text) => {
+    expect(formatLoggedTime(instant, { timeZone: 'Mars/Base', utcOffsetMin })).toBe(text);
   });
 });
 
