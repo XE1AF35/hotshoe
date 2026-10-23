@@ -4,7 +4,7 @@ import { addEntry, deleteEntry, listEntries, restoreEntry, updateEntry } from '.
 import { InvalidInputError, MissingRecordError } from './errors.ts';
 import { addPhoto, listPhotos } from './photos.ts';
 import type { EntryId, TripId } from './schema.ts';
-import { addTrip, deleteTrip } from './trips.ts';
+import { addTrip, deleteTrip, setActiveTrip, setTripArchived } from './trips.ts';
 
 describe('addEntry', () => {
   it('stores the entry with tidy text and timestamps', async () => {
@@ -35,6 +35,26 @@ describe('addEntry', () => {
     await expect(addEntry(db, newEntryInput({ tripId }))).rejects.toBeInstanceOf(
       MissingRecordError,
     );
+  });
+
+  it('joins the active trip when given no trip, and none when given null', async () => {
+    const db = createTestDb();
+    const trip = await addTrip(db, 'Coromandel');
+    expect((await addEntry(db, newEntryInput())).tripId).toBeNull();
+
+    await setActiveTrip(db, trip.id);
+    expect((await addEntry(db, newEntryInput())).tripId).toBe(trip.id);
+    expect((await addEntry(db, newEntryInput({ tripId: null }))).tripId).toBeNull();
+  });
+
+  it('rejects an archived trip', async () => {
+    const db = createTestDb();
+    const trip = await addTrip(db, 'Coromandel');
+    await setTripArchived(db, trip.id, true);
+    await expect(addEntry(db, newEntryInput({ tripId: trip.id }))).rejects.toBeInstanceOf(
+      InvalidInputError,
+    );
+    expect(await db.entries.count()).toBe(0);
   });
 });
 

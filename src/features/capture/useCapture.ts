@@ -2,7 +2,7 @@ import { useCallback, useEffect, useReducer, useRef, useSyncExternalStore } from
 import { useHoldUpdates } from '../../app/updates.ts';
 import { useDb } from '../../db/DbProvider.tsx';
 import { addEntry } from '../../db/entries.ts';
-import { MissingRecordError, StorageFullError } from '../../db/errors.ts';
+import { StorageFullError } from '../../db/errors.ts';
 import { getSetting, type Settings, setSetting } from '../../db/settings.ts';
 import { requestPersistence } from '../../lib/storage.ts';
 import { captureTimeContext } from '../../lib/time.ts';
@@ -14,7 +14,7 @@ import {
 } from './capture.ts';
 
 export interface CaptureOptions {
-  readonly settings: Pick<Settings, 'accuracyTargetM' | 'fixTimeoutS' | 'activeTripId'>;
+  readonly settings: Pick<Settings, 'accuracyTargetM' | 'fixTimeoutS'>;
   /** Injected for tests. */
   readonly geolocation?: Geolocation | undefined;
   readonly now?: () => number;
@@ -43,7 +43,7 @@ export function useCapture({
   const [state, dispatch] = useReducer(captureReducer, initialCaptureState);
   useHoldUpdates(state.status === 'locating' || state.status === 'saving');
   const visible = useSyncExternalStore(subscribeVisibility, isVisible);
-  const { accuracyTargetM, fixTimeoutS, activeTripId } = settings;
+  const { accuracyTargetM, fixTimeoutS } = settings;
 
   const start = useCallback(() => {
     dispatch({ type: 'start', at: now(), supported: geolocation !== undefined });
@@ -79,14 +79,8 @@ export function useCapture({
     void (async () => {
       const input = { ...fix, ...captureTimeContext(new Date(loggedAt)), loggedAt };
       try {
-        let entry: Awaited<ReturnType<typeof addEntry>>;
-        try {
-          entry = await addEntry(db, { ...input, tripId: activeTripId });
-        } catch (error) {
-          // The active trip was removed in another tab: keep the entry, without a trip.
-          if (!(error instanceof MissingRecordError) || activeTripId === null) throw error;
-          entry = await addEntry(db, { ...input, tripId: null });
-        }
+        // Joins the active trip as it is now, even if another tab changed it since the tap.
+        const entry = await addEntry(db, input);
         dispatch({ type: 'saved', entryId: entry.id });
         await askForPersistenceOnce(db);
       } catch (error) {
@@ -96,7 +90,7 @@ export function useCapture({
         });
       }
     })();
-  }, [state, db, activeTripId]);
+  }, [state, db]);
 
   return { state, start, accept, cancel };
 }

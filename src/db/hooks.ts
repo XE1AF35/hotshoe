@@ -4,7 +4,7 @@ import { listEntries } from './entries.ts';
 import { listPhotos, totalPhotoBytes } from './photos.ts';
 import type { Entry, EntryId, Photo, Trip, TripId } from './schema.ts';
 import { getSettings, type Settings } from './settings.ts';
-import { listTrips } from './trips.ts';
+import { activeTrip, listTrips } from './trips.ts';
 
 /** All settings, kept up to date. Undefined while loading. */
 export function useSettings(): Settings | undefined {
@@ -28,6 +28,12 @@ export function useEntries(): Entry[] | undefined {
 export function useTrips(): Trip[] | undefined {
   const db = useDb();
   return useLiveQuery(() => listTrips(db), [db]);
+}
+
+/** The trip new entries join, null when there is none. Undefined while loading. */
+export function useActiveTrip(): Trip | null | undefined {
+  const db = useDb();
+  return useLiveQuery(() => activeTrip(db), [db]);
 }
 
 /** How many entries each trip has. Undefined while loading. */

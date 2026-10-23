@@ -1,26 +1,28 @@
 import { useState } from 'react';
 import { Sheet } from '../../app/Sheet.tsx';
 import { useDb } from '../../db/DbProvider.tsx';
-import { useTrips } from '../../db/hooks.ts';
+import { useActiveTrip, useTrips } from '../../db/hooks.ts';
 import type { TripId } from '../../db/schema.ts';
-import { setSetting } from '../../db/settings.ts';
+import { setActiveTrip } from '../../db/trips.ts';
 import { NewTripForm } from './NewTripForm.tsx';
 
 /**
  * Shows the trip new entries join, and changes it. Choosing once saves picking a trip for every
  * entry.
  */
-export function ActiveTripPicker({ activeTripId }: { readonly activeTripId: TripId | null }) {
+export function ActiveTripPicker() {
   const db = useDb();
   const trips = useTrips();
+  const active = useActiveTrip();
   const [open, setOpen] = useState(false);
-  const active = trips?.find((trip) => trip.id === activeTripId) ?? null;
   const choices = trips?.filter((trip) => trip.archivedAt === null) ?? [];
 
   async function choose(tripId: TripId | null) {
-    await setSetting(db, 'activeTripId', tripId);
+    await setActiveTrip(db, tripId);
     setOpen(false);
   }
+
+  if (active === undefined) return null;
 
   return (
     <>

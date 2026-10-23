@@ -3,8 +3,15 @@ import { createTestDb, newEntryInput } from '../test/db.ts';
 import { addEntry } from './entries.ts';
 import { InvalidInputError, MissingRecordError } from './errors.ts';
 import type { TripId } from './schema.ts';
-import { getSetting, setSetting } from './settings.ts';
-import { addTrip, deleteTrip, listTrips, renameTrip, setTripArchived } from './trips.ts';
+import {
+  activeTrip,
+  addTrip,
+  deleteTrip,
+  listTrips,
+  renameTrip,
+  setActiveTrip,
+  setTripArchived,
+} from './trips.ts';
 
 describe('addTrip and renameTrip', () => {
   it('trims names and rejects blank or over-long ones', async () => {
@@ -33,13 +40,14 @@ describe('setTripArchived', () => {
   it('archives and unarchives, clearing the active trip when archived', async () => {
     const db = createTestDb();
     const trip = await addTrip(db, 'Coromandel');
-    await setSetting(db, 'activeTripId', trip.id);
+    await setActiveTrip(db, trip.id);
 
     const archived = await setTripArchived(db, trip.id, true, 5000);
     expect(archived.archivedAt).toBe(5000);
-    expect(await getSetting(db, 'activeTripId')).toBeNull();
+    expect(await activeTrip(db)).toBeNull();
 
     expect((await setTripArchived(db, trip.id, false)).archivedAt).toBeNull();
+    expect(await activeTrip(db)).toBeNull();
   });
 
   it('keeps the original archive time when archived twice', async () => {
@@ -55,7 +63,7 @@ describe('deleteTrip', () => {
     const db = createTestDb();
     const trip = await addTrip(db, 'Coromandel');
     const other = await addTrip(db, 'Northland');
-    await setSetting(db, 'activeTripId', trip.id);
+    await setActiveTrip(db, trip.id);
     const inTrip = await addEntry(db, newEntryInput({ tripId: trip.id }), 1000);
     const inOther = await addEntry(db, newEntryInput({ tripId: other.id }), 1000);
 
@@ -64,7 +72,51 @@ describe('deleteTrip', () => {
     expect(await db.trips.get(trip.id)).toBeUndefined();
     expect(await db.entries.get(inTrip.id)).toMatchObject({ tripId: null, updatedAt: 2000 });
     expect(await db.entries.get(inOther.id)).toEqual(inOther);
-    expect(await getSetting(db, 'activeTripId')).toBeNull();
+    expect(await activeTrip(db)).toBeNull();
+  });
+});
+
+describe('setActiveTrip and activeTrip', () => {
+  it('sets and clears the active trip', async () => {
+    const db = createTestDb();
+    const trip = await addTrip(db, 'Coromandel');
+    expect(await activeTrip(db)).toBeNull();
+
+    await setActiveTrip(db, trip.id);
+    expect(await activeTrip(db)).toEqual(trip);
+
+    await setActiveTrip(db, null);
+    expect(await activeTrip(db)).toBeNull();
+  });
+
+  it('refuses a missing or archived trip', async () => {
+    const db = createTestDb();
+    const trip = await addTrip(db, 'Coromandel');
+    const archived = await addTrip(db, 'Northland');
+    await setTripArchived(db, archived.id, true);
+    await setActiveTrip(db, trip.id);
+
+    await expect(setActiveTrip(db, 'missing' as TripId)).rejects.toBeInstanceOf(MissingRecordError);
+    await expect(setActiveTrip(db, archived.id)).rejects.toBeInstanceOf(InvalidInputError);
+    expect(await activeTrip(db)).toEqual(trip);
+  });
+
+  it('returns null for a stored id whose trip has gone', async () => {
+    const db = createTestDb();
+    // As an older version could leave it, before the trips module owned the setting.
+    await db.meta.put({ key: 'activeTripId', value: 'missing' });
+    expect(await activeTrip(db)).toBeNull();
+  });
+
+  it('does not bring back an archived trip an older version left active', async () => {
+    const db = createTestDb();
+    const trip = await addTrip(db, 'Coromandel');
+    await setTripArchived(db, trip.id, true);
+    await db.meta.put({ key: 'activeTripId', value: trip.id });
+    expect(await activeTrip(db)).toBeNull();
+
+    await setTripArchived(db, trip.id, false);
+    expect(await activeTrip(db)).toBeNull();
   });
 });
 

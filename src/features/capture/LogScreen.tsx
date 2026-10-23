@@ -23,7 +23,7 @@ export function LogScreen() {
   return (
     <section aria-labelledby="screen-title" className="flex flex-1 flex-col gap-6">
       <ScreenHeader title="Log">
-        {settings !== undefined && <ActiveTripPicker activeTripId={settings.activeTripId} />}
+        <ActiveTripPicker />
       </ScreenHeader>
       {settings === undefined || latest === undefined ? null : (
         <LogScreenBody settings={settings} latest={latest} />

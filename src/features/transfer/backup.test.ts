@@ -3,8 +3,13 @@ import { describe, expect, it } from 'vitest';
 import type { HotshoeDb } from '../../db/database.ts';
 import { addEntry, updateEntry } from '../../db/entries.ts';
 import { addPhoto, listPhotos } from '../../db/photos.ts';
-import { getSetting, setSetting } from '../../db/settings.ts';
-import { addTrip, setCameraClock } from '../../db/trips.ts';
+import {
+  activeTrip,
+  addTrip,
+  setActiveTrip,
+  setCameraClock,
+  setTripArchived,
+} from '../../db/trips.ts';
 import { createTestDb, jpegBlob, newEntryInput } from '../../test/db.ts';
 import {
   BackupError,
@@ -171,12 +176,29 @@ describe('restoreBackup', () => {
     await seed(db);
     const backup = readBackup(await backupBytes(createTestDb()));
     const other = await addTrip(db, 'Elsewhere');
-    await setSetting(db, 'activeTripId', other.id);
+    await setActiveTrip(db, other.id);
 
     expect(await restoreBackup(db, backup, 'replace')).toEqual({ entries: 0, photos: 0 });
     expect(await db.entries.count()).toBe(0);
     expect(await db.photos.count()).toBe(0);
-    expect(await getSetting(db, 'activeTripId')).toBeNull();
+    expect(await activeTrip(db)).toBeNull();
+  });
+
+  it('clears the active trip when a merge brings in a newer, archived copy of it', async () => {
+    const db = createTestDb();
+    const { trip } = await seed(db);
+    await setTripArchived(db, trip.id, true, 5000);
+    const backup = readBackup(await backupBytes(db));
+    // Here, the trip was unarchived before it was archived in the backup.
+    await setTripArchived(db, trip.id, false, 4000);
+    await setActiveTrip(db, trip.id);
+
+    await restoreBackup(db, backup, 'merge');
+    expect((await db.trips.get(trip.id))?.archivedAt).toBe(5000);
+    expect(await activeTrip(db)).toBeNull();
+    // Cleared, not just hidden: unarchiving doesn't bring it back.
+    await setTripArchived(db, trip.id, false, 6000);
+    expect(await activeTrip(db)).toBeNull();
   });
 });
 

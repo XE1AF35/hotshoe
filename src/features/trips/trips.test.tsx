@@ -4,8 +4,8 @@ import { DbProvider } from '../../db/DbProvider.tsx';
 import type { HotshoeDb } from '../../db/database.ts';
 import { addEntry, listEntries } from '../../db/entries.ts';
 import { addPhoto } from '../../db/photos.ts';
-import { getSetting, setSetting } from '../../db/settings.ts';
-import { addTrip, listTrips } from '../../db/trips.ts';
+import { getSetting } from '../../db/settings.ts';
+import { activeTrip, addTrip, listTrips, setActiveTrip } from '../../db/trips.ts';
 import { createTestDb, jpegBlob, newEntryInput } from '../../test/db.ts';
 import { MoreScreen } from '../settings/MoreScreen.tsx';
 import { ActiveTripPicker } from './ActiveTripPicker.tsx';
@@ -18,20 +18,20 @@ describe('ActiveTripPicker', () => {
   it('chooses the trip for new entries', async () => {
     const db = createTestDb();
     const trip = await addTrip(db, 'Coromandel');
-    renderWithDb(db, <ActiveTripPicker activeTripId={null} />);
+    renderWithDb(db, <ActiveTripPicker />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Trip: None/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Trip: None/ }));
     const sheet = await screen.findByRole('dialog', { name: 'Trip for new entries' });
     fireEvent.click(await within(sheet).findByLabelText('Coromandel'));
 
-    await waitFor(async () => expect(await getSetting(db, 'activeTripId')).toBe(trip.id));
+    await waitFor(async () => expect(await activeTrip(db)).toEqual(trip));
   });
 
   it('creates a trip and makes it active in one step', async () => {
     const db = createTestDb();
-    renderWithDb(db, <ActiveTripPicker activeTripId={null} />);
+    renderWithDb(db, <ActiveTripPicker />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Trip: None/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Trip: None/ }));
     const sheet = await screen.findByRole('dialog', { name: 'Trip for new entries' });
     fireEvent.change(within(sheet).getByLabelText('New trip'), {
       target: { value: 'Easter 2027' },
@@ -41,15 +41,15 @@ describe('ActiveTripPicker', () => {
     await waitFor(async () => {
       const [trip] = await listTrips(db);
       expect(trip?.name).toBe('Easter 2027');
-      expect(await getSetting(db, 'activeTripId')).toBe(trip?.id);
+      expect((await activeTrip(db))?.id).toBe(trip?.id);
     });
   });
 
   it('rejects a blank trip name', async () => {
     const db = createTestDb();
-    renderWithDb(db, <ActiveTripPicker activeTripId={null} />);
+    renderWithDb(db, <ActiveTripPicker />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Trip: None/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Trip: None/ }));
     const sheet = await screen.findByRole('dialog', { name: 'Trip for new entries' });
     fireEvent.click(within(sheet).getByRole('button', { name: 'Add' }));
 
@@ -62,7 +62,7 @@ describe('Trips on the More screen', () => {
   it('lists trips with their entry counts and the active one', async () => {
     const db = createTestDb();
     const trip = await addTrip(db, 'Coromandel');
-    await setSetting(db, 'activeTripId', trip.id);
+    await setActiveTrip(db, trip.id);
     await addEntry(db, newEntryInput({ tripId: trip.id }));
     await addEntry(db, newEntryInput({ tripId: trip.id }));
     renderWithDb(db, <MoreScreen />);

@@ -6,7 +6,9 @@ import {
   withStorageErrors,
 } from './errors.ts';
 import { type CameraClock, limits, newTripId, type Trip, type TripId } from './schema.ts';
-import { getSetting, setSetting } from './settings.ts';
+
+/** Kept in meta under the key it had as a setting, so no migration was needed. */
+const activeTripKey = 'activeTripId';
 
 function tripName(name: string): string {
   const normalised = normaliseText(name, limits.tripNameLength, 'Trip name');
@@ -45,12 +47,14 @@ export async function setTripArchived(
   now = Date.now(),
 ): Promise<Trip> {
   return db.transaction('rw', db.trips, db.meta, async () => {
+    // Settled first too, so an archived trip an older version left active can't come back here.
+    await settleActiveTrip(db);
     const updated = await updateTrip(db, id, (trip) => ({
       ...trip,
       archivedAt: archived ? (trip.archivedAt ?? now) : null,
       updatedAt: now,
     }));
-    if (archived) await clearActiveTripIf(db, id);
+    if (archived) await settleActiveTrip(db);
     return updated;
   });
 }
@@ -71,9 +75,54 @@ export async function deleteTrip(db: HotshoeDb, id: TripId, now = Date.now()): P
     db.transaction('rw', db.trips, db.entries, db.meta, async () => {
       await db.entries.where('tripId').equals(id).modify({ tripId: null, updatedAt: now });
       await db.trips.delete(id);
-      await clearActiveTripIf(db, id);
+      await settleActiveTrip(db);
     }),
   );
+}
+
+/**
+ * The trip new entries join, or null. It is always a trip that exists and isn't archived: a
+ * stored id that no longer meets that is read as none.
+ */
+export async function activeTrip(db: HotshoeDb): Promise<Trip | null> {
+  const id = await storedActiveTripId(db);
+  const trip = id === null ? undefined : await db.trips.get(id);
+  return trip !== undefined && isOpen(trip) ? trip : null;
+}
+
+/** Makes a trip the active one, or clears it with null. Refuses a missing or archived trip. */
+export async function setActiveTrip(db: HotshoeDb, id: TripId | null): Promise<void> {
+  await withStorageErrors(() =>
+    db.transaction('rw', db.trips, db.meta, async () => {
+      if (id !== null) await assertTripOpen(db, id);
+      await db.meta.put({ key: activeTripKey, value: id });
+    }),
+  );
+}
+
+/**
+ * Clears the active trip if it no longer exists or has been archived, so unarchiving never brings
+ * it back. Call it inside any transaction, over trips and meta, that can remove or archive trips.
+ */
+export async function settleActiveTrip(db: HotshoeDb): Promise<void> {
+  const id = await storedActiveTripId(db);
+  if (id === null) return;
+  const trip = await db.trips.get(id);
+  if (trip === undefined || !isOpen(trip)) await db.meta.put({ key: activeTripKey, value: null });
+}
+
+/** Throws unless the trip exists and isn't archived, so new entries can join it. */
+export async function assertTripOpen(db: HotshoeDb, id: TripId): Promise<void> {
+  const trip = await db.trips.get(id);
+  if (trip === undefined) throw new MissingRecordError(`Trip ${id} does not exist.`);
+  if (!isOpen(trip)) throw new InvalidInputError(`Trip ${id} is archived.`);
+}
+
+const isOpen = (trip: Trip): boolean => trip.archivedAt === null;
+
+async function storedActiveTripId(db: HotshoeDb): Promise<TripId | null> {
+  const row = await db.meta.get(activeTripKey);
+  return typeof row?.value === 'string' ? (row.value as TripId) : null;
 }
 
 /** All trips, newest first. */
@@ -91,10 +140,4 @@ async function updateTrip(db: HotshoeDb, id: TripId, change: (trip: Trip) => Tri
       return updated;
     }),
   );
-}
-
-async function clearActiveTripIf(db: HotshoeDb, id: TripId): Promise<void> {
-  if ((await getSetting(db, 'activeTripId')) === id) {
-    await setSetting(db, 'activeTripId', null);
-  }
 }

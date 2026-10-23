@@ -9,7 +9,7 @@ import { strFromU8, strToU8, unzipSync, type Zippable, zipSync } from 'fflate';
 import type { HotshoeDb } from '../../db/database.ts';
 import { withStorageErrors } from '../../db/errors.ts';
 import type { PhotoId, StoredPhoto } from '../../db/schema.ts';
-import { getSetting, setSetting } from '../../db/settings.ts';
+import { settleActiveTrip } from '../../db/trips.ts';
 import { fileDateStamp } from '../../lib/time.ts';
 import { type BackupJson, backupJsonSchema } from './backupSchema.ts';
 
@@ -221,10 +221,7 @@ export async function restoreBackup(
         await db.trips.bulkAdd(data.trips);
         await db.entries.bulkAdd(data.entries);
         await db.photos.bulkAdd(photos);
-        const activeTripId = await getSetting(db, 'activeTripId');
-        if (activeTripId !== null && !data.trips.some((trip) => trip.id === activeTripId)) {
-          await setSetting(db, 'activeTripId', null);
-        }
+        await settleActiveTrip(db);
         return { entries: data.entries.length, photos: photos.length };
       }
 
@@ -249,6 +246,7 @@ export async function restoreBackup(
       await db.trips.bulkPut(trips);
       await db.entries.bulkPut(entries);
       await db.photos.bulkAdd(newPhotos);
+      await settleActiveTrip(db);
       return { entries: entries.length, photos: newPhotos.length };
     }),
   );

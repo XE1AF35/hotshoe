@@ -15,6 +15,7 @@ import {
   type StoredPhoto,
   type TripId,
 } from './schema.ts';
+import { activeTrip, assertTripOpen } from './trips.ts';
 
 export interface NewEntry extends LatLon, TimeContext {
   readonly loggedAt: number;
@@ -24,7 +25,8 @@ export interface NewEntry extends LatLon, TimeContext {
   readonly altitudeAccuracyM: number | null;
   readonly label?: string | null;
   readonly frame?: string | null;
-  readonly tripId: TripId | null;
+  /** Left out, the entry joins the active trip as it is when saved. Null means no trip. */
+  readonly tripId?: TripId | null;
 }
 
 export interface EntryPatch {
@@ -47,7 +49,7 @@ export async function addEntry(db: HotshoeDb, input: NewEntry, now = Date.now())
     throw new InvalidInputError('Accuracy must be zero or more metres.');
   }
 
-  const entry: Entry = {
+  const fields = {
     id: newEntryId(),
     loggedAt: input.loggedAt,
     fixAt: input.fixAt,
@@ -60,19 +62,21 @@ export async function addEntry(db: HotshoeDb, input: NewEntry, now = Date.now())
     altitudeAccuracyM: input.altitudeAccuracyM,
     label: normaliseText(input.label, limits.labelLength, 'Label'),
     frame: normaliseText(input.frame, limits.frameLength, 'Frame'),
-    tripId: input.tripId,
     source: 'gps',
     createdAt: now,
     updatedAt: now,
-  };
+  } as const;
 
-  await withStorageErrors(() =>
-    db.transaction('rw', db.entries, db.trips, async () => {
-      await assertTripExists(db, entry.tripId);
+  return withStorageErrors(() =>
+    db.transaction('rw', db.entries, db.trips, db.meta, async () => {
+      if (input.tripId) await assertTripOpen(db, input.tripId);
+      const tripId =
+        input.tripId === undefined ? ((await activeTrip(db))?.id ?? null) : input.tripId;
+      const entry: Entry = { ...fields, tripId };
       await db.entries.add(entry);
+      return entry;
     }),
   );
-  return entry;
 }
 
 export async function updateEntry(

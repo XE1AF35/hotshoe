@@ -2,10 +2,10 @@ import { type FormEvent, useId, useState } from 'react';
 import { Sheet } from '../../app/Sheet.tsx';
 import { useDb } from '../../db/DbProvider.tsx';
 import { InvalidInputError } from '../../db/errors.ts';
-import { useSettings, useTripEntryCounts, useTrips } from '../../db/hooks.ts';
+import { useActiveTrip, useSettings, useTripEntryCounts, useTrips } from '../../db/hooks.ts';
 import { limits, type Trip, type TripId } from '../../db/schema.ts';
-import { defaultSettings, setSetting } from '../../db/settings.ts';
-import { deleteTrip, renameTrip, setTripArchived } from '../../db/trips.ts';
+import { defaultSettings } from '../../db/settings.ts';
+import { deleteTrip, renameTrip, setActiveTrip, setTripArchived } from '../../db/trips.ts';
 import { CameraClockPanel } from './CameraClockPanel.tsx';
 import { NewTripForm } from './NewTripForm.tsx';
 import { TripSummaryCard } from './TripSummaryCard.tsx';
@@ -14,6 +14,7 @@ export function TripsSection() {
   const trips = useTrips();
   const counts = useTripEntryCounts();
   const settings = useSettings();
+  const activeTripId = useActiveTrip()?.id;
   const [openId, setOpenId] = useState<TripId | null>(null);
   const openTrip = trips?.find((trip) => trip.id === openId) ?? null;
 
@@ -33,7 +34,7 @@ export function TripsSection() {
               >
                 <span className="min-w-0 flex-1 truncate font-medium">{trip.name}</span>
                 <span className="text-muted text-sm">
-                  {trip.id === settings?.activeTripId && 'Active · '}
+                  {trip.id === activeTripId && 'Active · '}
                   {trip.archivedAt !== null && 'Archived · '}
                   {entryCount(counts?.get(trip.id) ?? 0)}
                 </span>
@@ -50,7 +51,7 @@ export function TripsSection() {
             key={openTrip.id}
             trip={openTrip}
             entries={counts?.get(openTrip.id) ?? 0}
-            isActive={openTrip.id === settings?.activeTripId}
+            isActive={openTrip.id === activeTripId}
             accuracyTargetM={settings?.accuracyTargetM ?? defaultSettings.accuracyTargetM}
             onDone={() => setOpenId(null)}
           />
@@ -138,9 +139,7 @@ function TripForm({
         {!archived && (
           <button
             type="button"
-            onClick={() =>
-              void attempt(() => setSetting(db, 'activeTripId', isActive ? null : trip.id))
-            }
+            onClick={() => void attempt(() => setActiveTrip(db, isActive ? null : trip.id))}
             className="min-h-12 rounded-xl border border-line font-medium"
           >
             {isActive ? 'Stop adding new entries to this trip' : 'Add new entries to this trip'}

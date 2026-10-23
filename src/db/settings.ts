@@ -1,13 +1,11 @@
 import type { CoordFormat, CoordStyle, DecimalMark } from '../lib/coords.ts';
 import type { HotshoeDb } from './database.ts';
 import { withStorageErrors } from './errors.ts';
-import type { TripId } from './schema.ts';
 
 export type PhotoQuality = 'standard' | 'high';
 export type PersistResult = 'granted' | 'denied' | 'unsupported';
 
 export interface Settings {
-  activeTripId: TripId | null;
   lastBackupAt: number | null;
   /** Kept apart from lastBackupAt, since a backup can leave the photos out. */
   lastPhotoBackupAt: number | null;
@@ -29,7 +27,6 @@ export interface Settings {
 export type SettingKey = keyof Settings;
 
 export const defaultSettings: Readonly<Settings> = {
-  activeTripId: null,
   lastBackupAt: null,
   lastPhotoBackupAt: null,
   coordFormat: 'decimal',
@@ -49,7 +46,6 @@ const isTimestampOrNull = (value: unknown): value is number | null =>
   value === null || (typeof value === 'number' && Number.isFinite(value));
 
 const guards: { [K in SettingKey]: (value: unknown) => value is Settings[K] } = {
-  activeTripId: (value): value is TripId | null => value === null || typeof value === 'string',
   lastBackupAt: isTimestampOrNull,
   lastPhotoBackupAt: isTimestampOrNull,
   coordFormat: (value): value is CoordFormat => value === 'decimal' || value === 'dms',

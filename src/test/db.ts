@@ -26,7 +26,6 @@ export function newEntryInput(overrides: Partial<NewEntry> = {}): NewEntry {
     accuracyM: 8,
     altitudeM: 12.5,
     altitudeAccuracyM: 4,
-    tripId: null,
     ...overrides,
   };
 }

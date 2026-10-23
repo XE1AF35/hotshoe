@@ -5,7 +5,7 @@ import type { HotshoeDb } from '../../db/database.ts';
 import { addEntry, listEntries } from '../../db/entries.ts';
 import { addPhoto } from '../../db/photos.ts';
 import { setSetting } from '../../db/settings.ts';
-import { addTrip } from '../../db/trips.ts';
+import { addTrip, setActiveTrip } from '../../db/trips.ts';
 import { createTestDb, jpegBlob, newEntryInput } from '../../test/db.ts';
 import { installFakeGeolocation } from '../../test/geolocation.ts';
 import { LogScreen } from './LogScreen.tsx';
@@ -41,7 +41,7 @@ describe('LogScreen', () => {
   it('waits for an accurate fix, then saves it to the active trip', async () => {
     const db = createTestDb();
     const trip = await addTrip(db, 'Coromandel');
-    await setSetting(db, 'activeTripId', trip.id);
+    await setActiveTrip(db, trip.id);
     const gps = installFakeGeolocation();
     renderLogScreen(db);
 
