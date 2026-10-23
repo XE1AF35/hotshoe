@@ -31,6 +31,7 @@ Automated tests run in WebKit, which is close to iOS Safari but not the same. Ru
 - [ ] With Decimal mark set to Comma, copy a latitude on its own and paste it into digiKam's coordinate field.
 - [ ] In Entries, **Select** two entries and export them: only those two are in the file.
 - [ ] Make a backup with photos and save it to iCloud Drive.
+- [ ] Make a backup without photos after adding a photo: the More tab still says the photo isn't backed up, and a backup with photos clears it.
 - [ ] Restore that backup into a fresh install (delete and re-add the app): entries, trips, and photos all return.
 
 ## Map

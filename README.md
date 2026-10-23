@@ -51,7 +51,7 @@ Camera clocks drift, and are easy to leave on the wrong time zone. To correct fo
 Hotshoe keeps everything on this iPhone only. Deleting the app deletes your entries, and photos taken in Hotshoe aren't in your Photos app.
 
 - On the More tab, tap **Make backup**, then **Save or share backup**, and save it somewhere safe such as iCloud Drive. Keep **Include photos** ticked unless you only want a small text copy.
-- Hotshoe reminds you on the Log screen when a backup is due. You choose how often in Settings.
+- Hotshoe reminds you on the Log screen when new or edited entries, trips, or photos have waited too long for a backup. You choose how long in Settings. A backup without photos leaves new photos waiting, so the reminder keeps naming them until you make one with photos.
 - To restore, tap **Restore from a backup**. You see what's in the file first, then choose to add it to what's here or replace everything.
 
 ## Privacy
