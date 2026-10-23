@@ -18,8 +18,6 @@ export interface CoordStyle {
   readonly decimalMark: DecimalMark;
 }
 
-export const defaultCoordStyle: CoordStyle = { format: 'decimal', decimalMark: 'point' };
-
 /** Six decimal places is about 0.1 m, finer than any phone GPS fix. */
 const decimalPlaces = 6;
 

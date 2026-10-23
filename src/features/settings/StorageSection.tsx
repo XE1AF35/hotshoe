@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useSettings, useStoredCounts } from '../../db/hooks.ts';
+import { useStoredCounts } from '../../db/hooks.ts';
+import { useSettings } from '../../db/SettingsProvider.tsx';
 import type { PersistResult } from '../../db/settings.ts';
 import { formatBytes } from '../../lib/format.ts';
 
@@ -22,7 +23,7 @@ export function StorageSection() {
           {usage !== null && ` Hotshoe is using about ${formatBytes(usage)} in all.`}
         </p>
       )}
-      {settings && <p className="text-muted text-sm">{persistenceText(settings.persistResult)}</p>}
+      <p className="text-muted text-sm">{persistenceText(settings.persistResult)}</p>
     </section>
   );
 }

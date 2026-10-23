@@ -1,6 +1,6 @@
 import { useId } from 'react';
 import { useDb } from '../../db/DbProvider.tsx';
-import { useSettings } from '../../db/hooks.ts';
+import { useSettings } from '../../db/SettingsProvider.tsx';
 import {
   type PhotoQuality,
   type SettingKey,
@@ -26,7 +26,6 @@ export function SettingsSection() {
     reminderEntries: useId(),
     map: useId(),
   };
-  if (!settings) return null;
 
   function save<K extends SettingKey>(key: K, value: Settings[K]) {
     void setSetting(db, key, value);

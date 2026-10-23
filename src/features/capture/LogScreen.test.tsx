@@ -1,6 +1,5 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DbProvider } from '../../db/DbProvider.tsx';
 import type { HotshoeDb } from '../../db/database.ts';
 import { addEntry, listEntries } from '../../db/entries.ts';
 import { addPhoto } from '../../db/photos.ts';
@@ -8,14 +7,11 @@ import { setSetting } from '../../db/settings.ts';
 import { addTrip, setActiveTrip } from '../../db/trips.ts';
 import { createTestDb, jpegBlob, newEntryInput } from '../../test/db.ts';
 import { installFakeGeolocation } from '../../test/geolocation.ts';
+import { renderWithDb } from '../../test/render.tsx';
 import { LogScreen } from './LogScreen.tsx';
 
 function renderLogScreen(db: HotshoeDb) {
-  return render(
-    <DbProvider db={db}>
-      <LogScreen />
-    </DbProvider>,
-  );
+  return renderWithDb(db, <LogScreen />);
 }
 
 async function tapLog() {

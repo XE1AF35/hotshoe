@@ -5,11 +5,11 @@ import { ScreenHeader } from '../../app/ScreenHeader.tsx';
 import { Toast } from '../../app/Toast.tsx';
 import { useDb } from '../../db/DbProvider.tsx';
 import { type DeletedEntry, restoreEntry } from '../../db/entries.ts';
-import { useEntries, usePhotoCounts, useSettings, useTrips } from '../../db/hooks.ts';
+import { useEntries, usePhotoCounts, useTrips } from '../../db/hooks.ts';
 import { firstThumb } from '../../db/photos.ts';
+import { useSettings } from '../../db/SettingsProvider.tsx';
 import type { Entry, EntryId, Trip, TripId } from '../../db/schema.ts';
-import { coordStyleOf, defaultSettings } from '../../db/settings.ts';
-import { defaultCoordStyle } from '../../lib/coords.ts';
+import { coordStyleOf } from '../../db/settings.ts';
 import { formatDay, formatLoggedClock } from '../../lib/format.ts';
 import { useObjectUrl } from '../../lib/useObjectUrl.ts';
 import { AccuracyPill } from '../capture/AccuracyPill.tsx';
@@ -83,7 +83,7 @@ export function EntriesScreen() {
                   <li key={entry.id}>
                     <EntryRow
                       entry={entry}
-                      accuracyTargetM={settings?.accuracyTargetM ?? defaultSettings.accuracyTargetM}
+                      accuracyTargetM={settings.accuracyTargetM}
                       photos={photoCounts?.get(entry.id) ?? 0}
                       onOpen={() => setOpenId(entry.id)}
                       selection={
@@ -112,7 +112,7 @@ export function EntriesScreen() {
       <EntrySheet
         entry={openEntry}
         trips={trips ?? []}
-        coordStyle={settings ? coordStyleOf(settings) : defaultCoordStyle}
+        coordStyle={coordStyleOf(settings)}
         onClose={() => setOpenId(null)}
         onDeleted={setDeleted}
       />

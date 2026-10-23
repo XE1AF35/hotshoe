@@ -1,12 +1,11 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DbProvider } from '../../db/DbProvider.tsx';
-import type { HotshoeDb } from '../../db/database.ts';
 import { addEntry, listEntries } from '../../db/entries.ts';
 import { listPhotos } from '../../db/photos.ts';
 import { processPhoto } from '../../lib/image.ts';
 import { createTestDb, newEntryInput } from '../../test/db.ts';
 import { installFakeGeolocation } from '../../test/geolocation.ts';
+import { renderWithDb } from '../../test/render.tsx';
 import { LogScreen } from '../capture/LogScreen.tsx';
 import { PhotoStrip } from './PhotoStrip.tsx';
 
@@ -24,10 +23,6 @@ vi.mock('../../lib/image.ts', async (importOriginal) => ({
 afterEach(() => {
   vi.mocked(processPhoto).mockClear();
 });
-
-function renderWithDb(db: HotshoeDb, ui: React.ReactNode) {
-  return render(<DbProvider db={db}>{ui}</DbProvider>);
-}
 
 function choosePhoto(input: Element, name = 'shot.jpg') {
   const file = new File(['jpeg'], name, { type: 'image/jpeg', lastModified: 1_700_000_000_000 });
@@ -92,6 +87,7 @@ describe('PhotoStrip', () => {
     const entry = await addEntry(db, newEntryInput());
     const { container } = renderWithDb(db, <PhotoStrip entryId={entry.id} />);
 
+    await screen.findByRole('button', { name: 'Add from library' });
     const libraryInput = container.querySelector('input[multiple]');
     if (!libraryInput) throw new Error('library input missing');
     choosePhoto(libraryInput);

@@ -2,9 +2,9 @@ import { type FormEvent, useId, useState } from 'react';
 import { Sheet } from '../../app/Sheet.tsx';
 import { useDb } from '../../db/DbProvider.tsx';
 import { InvalidInputError } from '../../db/errors.ts';
-import { useActiveTrip, useSettings, useTripEntryCounts, useTrips } from '../../db/hooks.ts';
+import { useActiveTrip, useTripEntryCounts, useTrips } from '../../db/hooks.ts';
+import { useSettings } from '../../db/SettingsProvider.tsx';
 import { limits, type Trip, type TripId } from '../../db/schema.ts';
-import { defaultSettings } from '../../db/settings.ts';
 import { deleteTrip, renameTrip, setActiveTrip, setTripArchived } from '../../db/trips.ts';
 import { CameraClockPanel } from './CameraClockPanel.tsx';
 import { NewTripForm } from './NewTripForm.tsx';
@@ -52,7 +52,7 @@ export function TripsSection() {
             trip={openTrip}
             entries={counts?.get(openTrip.id) ?? 0}
             isActive={openTrip.id === activeTripId}
-            accuracyTargetM={settings?.accuracyTargetM ?? defaultSettings.accuracyTargetM}
+            accuracyTargetM={settings.accuracyTargetM}
             onDone={() => setOpenId(null)}
           />
         )}

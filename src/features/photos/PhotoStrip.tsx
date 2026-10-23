@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { CameraIcon } from '../../app/icons.tsx';
 import { useDb } from '../../db/DbProvider.tsx';
-import { usePhotos, useSettings } from '../../db/hooks.ts';
+import { usePhotos } from '../../db/hooks.ts';
+import { useSettings } from '../../db/SettingsProvider.tsx';
 import type { EntryId, Photo, PhotoId } from '../../db/schema.ts';
 import { useObjectUrl } from '../../lib/useObjectUrl.ts';
 import { attachPhotos, attachProblemMessage } from './attach.ts';
@@ -21,13 +22,7 @@ export function PhotoStrip({ entryId }: { readonly entryId: EntryId }) {
     setBusy(true);
     setMessage(null);
     try {
-      const result = await attachPhotos(
-        db,
-        entryId,
-        files,
-        settings?.photoQuality ?? 'standard',
-        source,
-      );
+      const result = await attachPhotos(db, entryId, files, settings.photoQuality, source);
       setMessage(attachProblemMessage(result.problem));
     } catch {
       setMessage("Couldn't add the photo. Try again.");

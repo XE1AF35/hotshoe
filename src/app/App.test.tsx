@@ -25,9 +25,9 @@ function renderApp() {
 }
 
 describe('App', () => {
-  it('opens on the Log tab', () => {
+  it('opens on the Log tab', async () => {
     renderApp();
-    expect(screen.getByRole('heading', { level: 1, name: 'Log' })).toBeDefined();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Log' })).toBeDefined();
     expect(screen.getByRole('link', { name: 'Log' }).getAttribute('aria-current')).toBe('page');
   });
 

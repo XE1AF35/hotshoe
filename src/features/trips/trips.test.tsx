@@ -1,18 +1,13 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { DbProvider } from '../../db/DbProvider.tsx';
-import type { HotshoeDb } from '../../db/database.ts';
 import { addEntry, listEntries } from '../../db/entries.ts';
 import { addPhoto } from '../../db/photos.ts';
 import { getSetting } from '../../db/settings.ts';
 import { activeTrip, addTrip, listTrips, setActiveTrip } from '../../db/trips.ts';
 import { createTestDb, jpegBlob, newEntryInput } from '../../test/db.ts';
+import { renderWithDb } from '../../test/render.tsx';
 import { MoreScreen } from '../settings/MoreScreen.tsx';
 import { ActiveTripPicker } from './ActiveTripPicker.tsx';
-
-function renderWithDb(db: HotshoeDb, ui: React.ReactNode) {
-  return render(<DbProvider db={db}>{ui}</DbProvider>);
-}
 
 describe('ActiveTripPicker', () => {
   it('chooses the trip for new entries', async () => {

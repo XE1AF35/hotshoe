@@ -3,9 +3,10 @@ import { CameraIcon, CheckIcon, CloseIcon, PinIcon } from '../../app/icons.tsx';
 import { ScreenHeader } from '../../app/ScreenHeader.tsx';
 import { useHoldUpdates } from '../../app/updates.ts';
 import { useDb } from '../../db/DbProvider.tsx';
-import { useLatestEntry, useSettings } from '../../db/hooks.ts';
+import { useLatestEntry } from '../../db/hooks.ts';
+import { useSettings } from '../../db/SettingsProvider.tsx';
 import type { Entry } from '../../db/schema.ts';
-import { coordStyleOf, type Settings } from '../../db/settings.ts';
+import { coordStyleOf } from '../../db/settings.ts';
 import { formatAccuracy } from '../../lib/format.ts';
 import { attachPhotos, attachProblemMessage } from '../photos/attach.ts';
 import { usePhotoInputs } from '../photos/usePhotoInputs.tsx';
@@ -17,7 +18,6 @@ import { EntryCard } from './EntryCard.tsx';
 import { useCapture } from './useCapture.ts';
 
 export function LogScreen() {
-  const settings = useSettings();
   const latest = useLatestEntry();
 
   return (
@@ -25,21 +25,14 @@ export function LogScreen() {
       <ScreenHeader title="Log">
         <ActiveTripPicker />
       </ScreenHeader>
-      {settings === undefined || latest === undefined ? null : (
-        <LogScreenBody settings={settings} latest={latest} />
-      )}
+      {latest === undefined ? null : <LogScreenBody latest={latest} />}
     </section>
   );
 }
 
-function LogScreenBody({
-  settings,
-  latest,
-}: {
-  readonly settings: Settings;
-  readonly latest: Entry | null;
-}) {
+function LogScreenBody({ latest }: { readonly latest: Entry | null }) {
   const db = useDb();
+  const settings = useSettings();
   const capture = useCapture({ settings });
   const { state } = capture;
   const justSaved = state.status === 'saved' && latest?.id === state.entryId;

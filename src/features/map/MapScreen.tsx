@@ -13,10 +13,10 @@ import { MapIcon } from '../../app/icons.tsx';
 import { useDetail } from '../../app/router.ts';
 import { ScreenHeader } from '../../app/ScreenHeader.tsx';
 import { useDb } from '../../db/DbProvider.tsx';
-import { useEntries, useSettings, useTrips } from '../../db/hooks.ts';
+import { useEntries, useTrips } from '../../db/hooks.ts';
+import { useSettings } from '../../db/SettingsProvider.tsx';
 import type { EntryId } from '../../db/schema.ts';
-import { coordStyleOf, defaultSettings, setSetting } from '../../db/settings.ts';
-import { defaultCoordStyle } from '../../lib/coords.ts';
+import { coordStyleOf, setSetting } from '../../db/settings.ts';
 import { MapEntryCard } from './MapEntryCard.tsx';
 import type { MapFocus } from './MapView.tsx';
 import { entryPoints, type TripFilter } from './points.ts';
@@ -40,7 +40,7 @@ export function MapScreen() {
   const [selectedId, setSelectedId] = useState<EntryId | null>(null);
   const [focus, setFocus] = useState<MapFocus | null>(null);
   const [loadRequested, setLoadRequested] = useState(loadedThisVisit);
-  const showMap = loadRequested || settings?.mapLoadsAutomatically === true;
+  const showMap = loadRequested || settings.mapLoadsAutomatically;
 
   const points = useMemo(() => entryPoints(entries ?? [], filter), [entries, filter]);
   const selected = entries?.find((entry) => entry.id === selectedId) ?? null;
@@ -138,8 +138,8 @@ export function MapScreen() {
           {selected && (
             <MapEntryCard
               entry={selected}
-              coordStyle={settings ? coordStyleOf(settings) : defaultCoordStyle}
-              accuracyTargetM={settings?.accuracyTargetM ?? defaultSettings.accuracyTargetM}
+              coordStyle={coordStyleOf(settings)}
+              accuracyTargetM={settings.accuracyTargetM}
               onClose={() => setSelectedId(null)}
             />
           )}

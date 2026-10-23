@@ -3,14 +3,7 @@ import { useDb } from './DbProvider.tsx';
 import { listEntries } from './entries.ts';
 import { listPhotos, totalPhotoBytes } from './photos.ts';
 import type { Entry, EntryId, Photo, Trip, TripId } from './schema.ts';
-import { getSettings, type Settings } from './settings.ts';
 import { activeTrip, listTrips } from './trips.ts';
-
-/** All settings, kept up to date. Undefined while loading. */
-export function useSettings(): Settings | undefined {
-  const db = useDb();
-  return useLiveQuery(() => getSettings(db), [db]);
-}
 
 /** The most recently logged entry, null when there are none. Undefined while loading. */
 export function useLatestEntry(): Entry | null | undefined {

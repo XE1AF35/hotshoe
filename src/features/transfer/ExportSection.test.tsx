@@ -1,11 +1,11 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DbProvider } from '../../db/DbProvider.tsx';
 import { addEntry } from '../../db/entries.ts';
 import { addPhoto } from '../../db/photos.ts';
 import { addTrip, renameTrip } from '../../db/trips.ts';
 import { saveFile } from '../../lib/share.ts';
 import { createTestDb, jpegBlob, newEntryInput } from '../../test/db.ts';
+import { renderWithDb } from '../../test/render.tsx';
 import { ExportSection } from './ExportSection.tsx';
 
 vi.mock('../../lib/share.ts', () => ({ saveFile: vi.fn(async () => 'shared') }));
@@ -28,12 +28,8 @@ describe('ExportSection', () => {
     const db = createTestDb();
     const trip = await addTrip(db, 'Waiheke');
     const entry = await addEntry(db, newEntryInput({ tripId: trip.id }));
-    render(
-      <DbProvider db={db}>
-        <ExportSection />
-      </DbProvider>,
-    );
-    fireEvent.click(screen.getByRole('radio', { name: /^CSV/ }));
+    renderWithDb(db, <ExportSection />);
+    fireEvent.click(await screen.findByRole('radio', { name: /^CSV/ }));
     await waitFor(async () => expect(await sharedText()).toContain(',Waiheke,'));
 
     await renameTrip(db, trip.id, 'Rakino');

@@ -1,18 +1,14 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { DbProvider } from '../../db/DbProvider.tsx';
 import type { HotshoeDb } from '../../db/database.ts';
 import { addEntry, listEntries } from '../../db/entries.ts';
 import { addTrip } from '../../db/trips.ts';
 import { createTestDb, newEntryInput } from '../../test/db.ts';
+import { renderWithDb } from '../../test/render.tsx';
 import { EntriesScreen } from './EntriesScreen.tsx';
 
 function renderEntries(db: HotshoeDb) {
-  return render(
-    <DbProvider db={db}>
-      <EntriesScreen />
-    </DbProvider>,
-  );
+  return renderWithDb(db, <EntriesScreen />);
 }
 
 describe('EntriesScreen', () => {
