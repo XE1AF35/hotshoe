@@ -196,6 +196,17 @@ describe('captureReducer with photos', () => {
     });
   });
 
+  it('takes photos off the list once they are being attached', () => {
+    const entryId = 'entry-1' as EntryId;
+    const saved = run([start, taken(first), position(5), { type: 'saved', entryId }]);
+    expect(run([taken(second), { type: 'photosAttaching', files: [first] }], saved)).toEqual({
+      status: 'saved',
+      entryId,
+      photos: [second],
+      waiting: [],
+    });
+  });
+
   it('gives photos that arrive after a quick save to that entry', () => {
     const entryId = 'entry-1' as EntryId;
     expect(run([start, position(5), { type: 'saved', entryId }, taken(first)])).toEqual({

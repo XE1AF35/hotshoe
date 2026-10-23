@@ -11,7 +11,7 @@ import { BackupReminder } from '../transfer/BackupReminder.tsx';
 import { ActiveTripPicker } from '../trips/ActiveTripPicker.tsx';
 import { CaptureProblem } from './CaptureProblem.tsx';
 import { useCapture } from './CaptureProvider.tsx';
-import { type CaptureState, fixProgress } from './capture.ts';
+import { type CaptureState, fixProgress, isBusy } from './capture.ts';
 import { EntryCard } from './EntryCard.tsx';
 
 export function LogScreen() {
@@ -44,7 +44,7 @@ function LogScreenBody({ latest }: { readonly latest: Entry | null }) {
     <>
       <BackupReminder />
       {state.status === 'failed' && <CaptureProblem reason={state.reason} />}
-      {state.waiting.length > 0 && state.status !== 'locating' && state.status !== 'saving' && (
+      {state.waiting.length > 0 && !isBusy(state) && (
         <p role="status" className="rounded-2xl bg-warning p-4 text-on-warning text-sm">
           Your photo is waiting. Tap Log location and it will be added to that entry.
         </p>
@@ -100,8 +100,6 @@ function CaptureControls({
   readonly onAccept: () => void;
   readonly onCancel: () => void;
 }) {
-  const busy = state.status === 'locating' || state.status === 'saving';
-
   return (
     <div className="space-y-4">
       {/* The accuracy changes several times a second, so screen readers hear only the stage. */}
@@ -117,7 +115,7 @@ function CaptureControls({
        * circles keep their size while the labels grow with the text size setting and wrap.
        */}
       <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-start gap-2">
-        {busy ? (
+        {state.status === 'locating' || state.status === 'saving' ? (
           <>
             <SideButton onClick={onCancel} disabled={state.status === 'saving'} label="Cancel">
               <CloseIcon className="size-6" />

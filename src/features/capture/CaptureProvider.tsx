@@ -7,7 +7,6 @@ import {
   useMemo,
   useReducer,
   useRef,
-  useState,
   useSyncExternalStore,
 } from 'react';
 import { useHoldUpdates } from '../../app/updates.ts';
@@ -18,13 +17,14 @@ import { useSettings } from '../../db/SettingsProvider.tsx';
 import { getSetting, setSetting } from '../../db/settings.ts';
 import { requestPersistence } from '../../lib/storage.ts';
 import { captureTimeContext } from '../../lib/time.ts';
-import { attachPhotos, attachProblemMessage } from '../photos/attach.ts';
 import {
   type CaptureState,
   captureReducer,
   fixFromPosition,
   initialCaptureState,
+  isBusy,
 } from './capture.ts';
+import { useAttachPhotos } from './useAttachPhotos.ts';
 
 export interface Capture {
   /** Includes the photos waiting for the next successful save. */
@@ -61,16 +61,13 @@ export function CaptureProvider({
   readonly children: ReactNode;
 }) {
   const db = useDb();
-  const { accuracyTargetM, fixTimeoutS, photoQuality } = useSettings();
+  const { accuracyTargetM, fixTimeoutS } = useSettings();
   const [state, dispatch] = useReducer(captureReducer, initialCaptureState);
-  const [photoMessage, setPhotoMessage] = useState<string | null>(null);
-  useHoldUpdates(
-    state.status === 'locating' || state.status === 'saving' || state.waiting.length > 0,
-  );
+  const photoMessage = useAttachPhotos(state, dispatch);
+  useHoldUpdates(isBusy(state) || state.waiting.length > 0);
   const visible = useSyncExternalStore(subscribeVisibility, isVisible);
 
   const start = useCallback(() => {
-    setPhotoMessage(null);
     dispatch({ type: 'start', at: now(), supported: geolocation !== undefined });
   }, [geolocation, now]);
   const accept = useCallback(() => dispatch({ type: 'accept' }), []);
@@ -117,19 +114,6 @@ export function CaptureProvider({
       }
     })();
   }, [state, db]);
-
-  // Attach each photo handed over to the saved entry once, including any that arrive later.
-  const attached = useRef(new WeakSet<File>());
-  useEffect(() => {
-    if (state.status !== 'saved') return;
-    const files = state.photos.filter((file) => !attached.current.has(file));
-    if (files.length === 0) return;
-    for (const file of files) attached.current.add(file);
-    setPhotoMessage('Adding photo…');
-    attachPhotos(db, state.entryId, files, photoQuality, 'camera')
-      .then((result) => setPhotoMessage(attachProblemMessage(result.problem)))
-      .catch(() => setPhotoMessage("Couldn't add the photo."));
-  }, [state, db, photoQuality]);
 
   const capture = useMemo(
     () => ({ state, photoMessage, start, accept, cancel, addPhotos }),

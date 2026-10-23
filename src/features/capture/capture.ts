@@ -33,7 +33,10 @@ type CaptureStep =
   | {
       readonly status: 'saved';
       readonly entryId: EntryId;
-      /** Photos handed over to this entry, including any that arrive after it saved. */
+      /**
+       * Photos handed over to this entry and not yet being attached, including any that arrive
+       * after it saved.
+       */
       readonly photos: readonly File[];
     }
   | { readonly status: 'failed'; readonly reason: FailReason };
@@ -53,7 +56,10 @@ export type CaptureEvent =
   | { readonly type: 'cancel' }
   | { readonly type: 'saved'; readonly entryId: EntryId }
   | { readonly type: 'saveFailed'; readonly reason: 'storage-full' | 'save-error' }
-  | { readonly type: 'photosTaken'; readonly files: readonly File[] };
+  | { readonly type: 'photosTaken'; readonly files: readonly File[] }
+  | { readonly type: 'photosAttaching'; readonly files: readonly File[] };
+
+type StepEvent = Exclude<CaptureEvent, { type: 'saved' | 'photosTaken' | 'photosAttaching' }>;
 
 /** GeolocationPositionError codes, which are fixed by the specification. */
 const permissionDenied = 1;
@@ -61,35 +67,67 @@ const positionUnavailable = 2;
 
 export const initialCaptureState: CaptureState = { status: 'idle', waiting: [] };
 
+/** Whether a Log is under way: finding a fix or saving it. */
+export function isBusy(state: CaptureStep): boolean {
+  return state.status === 'locating' || state.status === 'saving';
+}
+
 /**
  * The capture flow as a pure function, so every path can be tested without a device.
  *
+ * Waiting photos ride along unchanged until the entry saves, when they are handed over to it.
+ */
+export function captureReducer(state: CaptureState, event: CaptureEvent): CaptureState {
+  switch (event.type) {
+    case 'saved':
+      return state.status === 'saving'
+        ? { status: 'saved', entryId: event.entryId, photos: state.waiting, waiting: [] }
+        : state;
+
+    case 'photosTaken':
+      // The camera can close after a quick fix has already saved: those photos are that entry's.
+      return state.status === 'saved'
+        ? { ...state, photos: [...state.photos, ...event.files] }
+        : { ...state, waiting: [...state.waiting, ...event.files] };
+
+    case 'photosAttaching':
+      return state.status === 'saved'
+        ? { ...state, photos: state.photos.filter((file) => !event.files.includes(file)) }
+        : state;
+
+    default: {
+      const next = stepReducer(state, event);
+      return next === state ? state : { ...next, waiting: state.waiting };
+    }
+  }
+}
+
+/**
  * Fixes improve over a few seconds, so the best one so far is kept. The entry is saved as soon as
  * a fix is accurate enough, when the person accepts the best fix so far, or at the time limit if
  * any fix has arrived. Errors other than a refused permission are often brief on iOS, so they only
  * count if the time limit passes with no fix at all.
  */
-export function captureReducer(state: CaptureState, event: CaptureEvent): CaptureState {
-  const { waiting } = state;
+function stepReducer(state: CaptureStep, event: StepEvent): CaptureStep {
   switch (event.type) {
     case 'start':
-      if (state.status === 'locating' || state.status === 'saving') return state;
+      if (isBusy(state)) return state;
       return event.supported
-        ? { status: 'locating', loggedAt: event.at, best: null, lastError: null, waiting }
-        : { status: 'failed', reason: 'unsupported', waiting };
+        ? { status: 'locating', loggedAt: event.at, best: null, lastError: null }
+        : { status: 'failed', reason: 'unsupported' };
 
     case 'position': {
       if (state.status !== 'locating') return state;
       const best =
         state.best === null || event.fix.accuracyM <= state.best.accuracyM ? event.fix : state.best;
       return best.accuracyM <= event.targetM
-        ? { status: 'saving', loggedAt: state.loggedAt, fix: best, waiting }
+        ? { status: 'saving', loggedAt: state.loggedAt, fix: best }
         : { ...state, best };
     }
 
     case 'positionError':
       if (state.status !== 'locating') return state;
-      if (event.code === permissionDenied) return { status: 'failed', reason: 'denied', waiting };
+      if (event.code === permissionDenied) return { status: 'failed', reason: 'denied' };
       return {
         ...state,
         lastError: event.code === positionUnavailable ? 'unavailable' : 'timeout',
@@ -97,32 +135,19 @@ export function captureReducer(state: CaptureState, event: CaptureEvent): Captur
 
     case 'accept':
       if (state.status !== 'locating' || state.best === null) return state;
-      return { status: 'saving', loggedAt: state.loggedAt, fix: state.best, waiting };
+      return { status: 'saving', loggedAt: state.loggedAt, fix: state.best };
 
     case 'timeout':
       if (state.status !== 'locating') return state;
       return state.best === null
-        ? { status: 'failed', reason: state.lastError ?? 'timeout', waiting }
-        : { status: 'saving', loggedAt: state.loggedAt, fix: state.best, waiting };
+        ? { status: 'failed', reason: state.lastError ?? 'timeout' }
+        : { status: 'saving', loggedAt: state.loggedAt, fix: state.best };
 
     case 'cancel':
-      return state.status === 'locating' ? { status: 'idle', waiting } : state;
-
-    case 'saved':
-      return state.status === 'saving'
-        ? { status: 'saved', entryId: event.entryId, photos: waiting, waiting: [] }
-        : state;
+      return state.status === 'locating' ? { status: 'idle' } : state;
 
     case 'saveFailed':
-      return state.status === 'saving'
-        ? { status: 'failed', reason: event.reason, waiting }
-        : state;
-
-    case 'photosTaken':
-      // The camera can close after a quick fix has already saved: those photos are that entry's.
-      return state.status === 'saved'
-        ? { ...state, photos: [...state.photos, ...event.files] }
-        : { ...state, waiting: [...waiting, ...event.files] };
+      return state.status === 'saving' ? { status: 'failed', reason: event.reason } : state;
   }
 }
 
