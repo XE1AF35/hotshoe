@@ -88,6 +88,34 @@ describe('updateEntry', () => {
     expect((await updateEntry(db, entry.id, { label: null })).label).toBeNull();
   });
 
+  it('moves the logged time and its context, keeping the fix time', async () => {
+    const db = createTestDb();
+    const entry = await addEntry(db, newEntryInput({ label: 'Wharf' }), 1000);
+    const loggedAt = Date.parse('2026-06-01T02:00:00Z');
+
+    const updated = await updateEntry(
+      db,
+      entry.id,
+      { logged: { loggedAt, timeZone: 'Pacific/Auckland', utcOffsetMin: 720 } },
+      2000,
+    );
+
+    expect(updated).toEqual({ ...entry, loggedAt, utcOffsetMin: 720, updatedAt: 2000 });
+    expect(updated.fixAt).toBe(entry.fixAt);
+    expect(await db.entries.get(entry.id)).toEqual(updated);
+  });
+
+  it('rejects a logged time that is no number', async () => {
+    const db = createTestDb();
+    const entry = await addEntry(db, newEntryInput());
+    await expect(
+      updateEntry(db, entry.id, {
+        logged: { loggedAt: Number.NaN, timeZone: 'Pacific/Auckland', utcOffsetMin: 780 },
+      }),
+    ).rejects.toBeInstanceOf(InvalidInputError);
+    expect(await db.entries.get(entry.id)).toEqual(entry);
+  });
+
   it('fails for a missing entry', async () => {
     const db = createTestDb();
     await expect(updateEntry(db, 'missing' as EntryId, { label: 'x' })).rejects.toBeInstanceOf(

@@ -7,6 +7,7 @@ import {
   type TimeContext,
   zoneOffsetMin,
 } from '../../lib/time.ts';
+import { parseWallClock } from '../../lib/wallClock.ts';
 import { type ExifTags, readExif } from './exif.ts';
 
 /** What a photo's metadata says about the Entry it could become, before anything is saved. */
@@ -94,15 +95,9 @@ export function placeDraft(draft: PhotoDraft, { lat, lon }: LatLon): PhotoDraft 
  * zone. Missing while blank or incomplete.
  */
 export function typedTime(text: string, deviceZone: string): DraftTime {
-  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
-  if (!match) return { source: 'missing' };
-  const [year, month, day, hour, minute, second] = match
-    .slice(1)
-    .map((part) => Number(part ?? 0)) as [number, number, number, number, number, number];
-  const wall = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
-  // Date.UTC rolls a 31 February over into March.
-  if (wall.getUTCMonth() !== month - 1 || wall.getUTCDate() !== day) return { source: 'missing' };
-  const at = instantInZone(wall.getTime(), deviceZone);
+  const wall = parseWallClock(text);
+  if (wall === null) return { source: 'missing' };
+  const at = instantInZone(wall, deviceZone);
   if (at === null) return { source: 'missing' };
   return { source: 'typed', at, context: zoneContext(at, deviceZone) };
 }

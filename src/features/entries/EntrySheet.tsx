@@ -3,10 +3,11 @@ import { MapIcon } from '../../app/icons.tsx';
 import { detailHref } from '../../app/router.ts';
 import { Sheet } from '../../app/Sheet.tsx';
 import { useDb } from '../../db/DbProvider.tsx';
-import { type DeletedEntry, deleteEntry, updateEntry } from '../../db/entries.ts';
+import { type DeletedEntry, deleteEntry, type EntryPatch, updateEntry } from '../../db/entries.ts';
 import { type Entry, limits, type Trip } from '../../db/schema.ts';
 import type { CoordStyle } from '../../lib/coords.ts';
 import { formatLoggedTime } from '../../lib/format.ts';
+import { loggedTimeFromWallClock, parseWallClock, wallClockValue } from '../../lib/wallClock.ts';
 import { CoordLines } from '../capture/CoordLines.tsx';
 import { CopyCoordsButton } from '../capture/CopyCoordsButton.tsx';
 import { describeAccuracy } from '../capture/capture.ts';
@@ -56,8 +57,10 @@ function EntryForm({
   readonly onDeleted: (deleted: DeletedEntry) => void;
 }) {
   const db = useDb();
-  const ids = { label: useId(), frame: useId(), trip: useId() };
+  const ids = { label: useId(), time: useId(), frame: useId(), trip: useId() };
+  const [initialTime] = useState(() => wallClockValue(entry.loggedAt, entry));
   const [label, setLabel] = useState(entry.label ?? '');
+  const [time, setTime] = useState(initialTime);
   const [frame, setFrame] = useState(entry.frame ?? '');
   const [tripId, setTripId] = useState(entry.tripId);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -65,8 +68,18 @@ function EntryForm({
 
   async function save(event: FormEvent) {
     event.preventDefault();
+    let patch: EntryPatch = { label, frame, tripId };
+    // Left at the same minute, the time isn't sent, so its seconds stay.
+    if (parseWallClock(time) !== parseWallClock(initialTime)) {
+      const logged = loggedTimeFromWallClock(time, entry);
+      if (logged === null) {
+        setError('Enter a date and time.');
+        return;
+      }
+      patch = { ...patch, logged };
+    }
     try {
-      await updateEntry(db, entry.id, { label, frame, tripId });
+      await updateEntry(db, entry.id, patch);
       onClose();
     } catch {
       setError("Couldn't save your changes. Try again.");
@@ -117,6 +130,18 @@ function EntryForm({
           autoComplete="off"
           onChange={(event) => setLabel(event.target.value)}
           className="min-h-12 w-full rounded-xl border border-line bg-raised px-3 text-base"
+        />
+      </div>
+      <div className="space-y-1">
+        <label htmlFor={ids.time} className="block font-medium text-sm">
+          Date and time
+        </label>
+        <input
+          id={ids.time}
+          type="datetime-local"
+          value={time}
+          onChange={(event) => setTime(event.target.value)}
+          className="min-h-12 w-full min-w-0 rounded-xl border border-line bg-raised px-3 text-base"
         />
       </div>
       <div className="flex flex-wrap gap-3">

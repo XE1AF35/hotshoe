@@ -134,6 +134,65 @@ describe('EntriesScreen', () => {
     expect(await screen.findByText('Old wharf')).toBeDefined();
   });
 
+  it('moves an entry under its new day when its time changes, keeping the fix time', async () => {
+    const db = createTestDb();
+    // 14:00:30 on 14 October 2026 in Auckland.
+    const entry = await addEntry(
+      db,
+      newEntryInput({ loggedAt: Date.parse('2026-10-14T01:00:30Z'), label: 'Wharf' }),
+    );
+    renderEntries(db);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Wharf/ }));
+    const sheet = await screen.findByRole('dialog', { name: 'Entry' });
+    const field = within(sheet).getByLabelText('Date and time') as HTMLInputElement;
+    expect(field.value).toBe('2026-10-14T14:00');
+    fireEvent.change(field, { target: { value: '2026-10-16T09:15' } });
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Save' }));
+
+    const moved = await screen.findByRole('region', { name: 'Friday, 16 October 2026' });
+    expect(within(moved).getByText('Wharf')).toBeDefined();
+    expect(screen.queryByRole('region', { name: 'Wednesday, 14 October 2026' })).toBeNull();
+    const [stored] = await listEntries(db);
+    expect(stored).toMatchObject({
+      loggedAt: Date.parse('2026-10-15T20:15:00Z'),
+      fixAt: entry.fixAt,
+      timeZone: 'Pacific/Auckland',
+      utcOffsetMin: 780,
+    });
+    expect(stored?.updatedAt).toBeGreaterThan(entry.updatedAt);
+  });
+
+  it('keeps the seconds when saving without touching the time', async () => {
+    const db = createTestDb();
+    const loggedAt = Date.parse('2026-10-14T01:00:30.250Z');
+    await addEntry(db, newEntryInput({ loggedAt, label: 'Wharf' }));
+    renderEntries(db);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Wharf/ }));
+    const sheet = await screen.findByRole('dialog', { name: 'Entry' });
+    fireEvent.change(within(sheet).getByLabelText('Label'), { target: { value: 'Old wharf' } });
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('Old wharf')).toBeDefined();
+    expect((await listEntries(db))[0]?.loggedAt).toBe(loggedAt);
+  });
+
+  it('saves nothing when the time is empty', async () => {
+    const db = createTestDb();
+    const entry = await addEntry(db, newEntryInput({ label: 'Wharf' }));
+    renderEntries(db);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Wharf/ }));
+    const sheet = await screen.findByRole('dialog', { name: 'Entry' });
+    fireEvent.change(within(sheet).getByLabelText('Label'), { target: { value: 'Old wharf' } });
+    fireEvent.change(within(sheet).getByLabelText('Date and time'), { target: { value: '' } });
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Save' }));
+
+    expect((await within(sheet).findByRole('alert')).textContent).toBe('Enter a date and time.');
+    expect(await db.entries.get(entry.id)).toEqual(entry);
+  });
+
   it('deletes after confirming, and undo brings the entry back', async () => {
     const db = createTestDb();
     await addEntry(db, newEntryInput({ label: 'Wharf' }));

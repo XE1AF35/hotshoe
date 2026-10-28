@@ -1,5 +1,6 @@
 import { isValidLatLon, type LatLon } from '../lib/coords.ts';
 import type { TimeContext } from '../lib/time.ts';
+import type { LoggedTime } from '../lib/wallClock.ts';
 import type { HotshoeDb } from './database.ts';
 import {
   InvalidInputError,
@@ -37,6 +38,8 @@ export interface EntryPatch {
   readonly label?: string | null;
   readonly frame?: string | null;
   readonly tripId?: TripId | null;
+  /** A new logged time with its context. When the Fix arrived (`fixAt`) stays as it was. */
+  readonly logged?: LoggedTime;
 }
 
 /** Everything removed by deleteEntry, so the delete can be undone. */
@@ -101,6 +104,15 @@ export async function updateEntry(
   }
   if (patch.tripId !== undefined) {
     changes.tripId = patch.tripId;
+  }
+  if (patch.logged !== undefined) {
+    const { loggedAt, timeZone, utcOffsetMin } = patch.logged;
+    if (!Number.isFinite(loggedAt) || !Number.isFinite(utcOffsetMin)) {
+      throw new InvalidInputError('Logged time must be a valid time.');
+    }
+    changes.loggedAt = loggedAt;
+    changes.timeZone = timeZone;
+    changes.utcOffsetMin = utcOffsetMin;
   }
 
   return withStorageErrors(() =>

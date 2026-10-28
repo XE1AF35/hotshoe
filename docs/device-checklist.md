@@ -30,6 +30,7 @@ Automated tests run in WebKit, which is close to iOS Safari but not the same. Ru
 - [ ] Photograph Hotshoe's camera clock with your camera, enter both times, and export the trip's GPX matched to the camera clock: in digiKam, with the same time zone set, photos land where they were taken.
 - [ ] With Decimal mark set to Comma, copy a latitude on its own and paste it into digiKam's coordinate field.
 - [ ] In Entries, **Select** two entries and export them: only those two are in the file.
+- [ ] In Entries, open an Entry and set its **Date and time** with the wheel: it moves to its new Day and shows the time you set.
 - [ ] Make a backup with photos and save it to iCloud Drive.
 - [ ] Make a backup without photos after adding a photo: the More tab still says the photo isn't backed up, and a backup with photos clears it.
 - [ ] Restore that backup into a fresh install (delete and re-add the app): entries, trips, and photos all return.
