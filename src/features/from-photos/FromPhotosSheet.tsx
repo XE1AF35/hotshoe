@@ -28,7 +28,7 @@ interface Row {
   readonly key: number;
   readonly draft: PhotoDraft;
   readonly ticked: boolean;
-  /** Its shot time matches, to the second, a Photo already stored. */
+  /** Its shot time is within a second of a Photo already stored. */
   readonly alreadyAdded: boolean;
   /** The date and time field's value, for a photo whose time couldn't be found. */
   readonly typed: string;
@@ -67,12 +67,12 @@ export function FromPhotosSheet({
   useEffect(() => {
     let current = true;
     const reading = Promise.all(files.map((file) => readPhotoDraft(file, deviceZone)));
-    void Promise.all([reading, storedPhotoSecondCheck(db)]).then(([drafts, isStoredSecond]) => {
+    void Promise.all([reading, storedPhotoSecondCheck(db)]).then(([drafts, isNearStoredPhoto]) => {
       if (!current) return;
       setPicked(
         drafts.map((draft, key) => {
-          // Checked against stored Photos only, so two shots in the same second aren't repeats.
-          const alreadyAdded = draft.time.source !== 'missing' && isStoredSecond(draft.time.at);
+          // Checked against stored Photos only, so a burst isn't marked against itself.
+          const alreadyAdded = draft.time.source !== 'missing' && isNearStoredPhoto(draft.time.at);
           return {
             key,
             draft,

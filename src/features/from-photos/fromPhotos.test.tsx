@@ -539,20 +539,21 @@ describe('From photos', () => {
     expect(await listEntries(db)).toHaveLength(2);
   });
 
-  it('marks a photo taken in the same second as one from Log with photo, and adds it if ticked', async () => {
+  it('marks a photo taken within a second of one from Log with photo, and adds it if ticked', async () => {
     const db = createTestDb();
     const logged = await addEntry(db, newEntryInput());
-    // The camera's file date, a fraction of a second after the shot time in the metadata.
+    // Log with photo keeps the camera's file date, written just after the shot and here in the
+    // next second.
     await photosRepo.addPhoto(
       db,
-      newPhotoInput(logged.id, { takenAt: Date.parse('2026-10-13T21:35:12.640Z') }),
+      newPhotoInput(logged.id, { takenAt: Date.parse('2026-10-13T21:35:13.100Z') }),
     );
 
     const sheet = await pick(db, [
-      photoFile('IMG_0001.JPG', harbour),
-      // Shot a second later, and twice in that second, as a burst does.
-      photoFile('IMG_0002.JPG', { ...harbour, dateTimeOriginal: '2026:10:14 10:35:13' }),
-      photoFile('IMG_0003.JPG', { ...harbour, dateTimeOriginal: '2026:10:14 10:35:13' }),
+      photoFile('IMG_0001.JPG', { ...harbour, subSecTimeOriginal: '90' }),
+      // Shot two seconds later, and twice in that second, as a burst does.
+      photoFile('IMG_0002.JPG', { ...harbour, dateTimeOriginal: '2026:10:14 10:35:15' }),
+      photoFile('IMG_0003.JPG', { ...harbour, dateTimeOriginal: '2026:10:14 10:35:15' }),
     ]);
 
     const again = await within(sheet).findByRole('checkbox', { name: /IMG_0001.*Already added/ });

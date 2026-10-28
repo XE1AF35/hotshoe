@@ -48,8 +48,9 @@ export async function firstThumb(db: HotshoeDb, entryId: EntryId): Promise<Blob 
 }
 
 /**
- * A check of whether a time falls in the same second as a stored photo's shot time, for spotting
- * photos added before.
+ * A check of whether a time falls within a second of a stored photo's shot time, for spotting
+ * photos added before. The second either side counts too, since a photo from Log with photo
+ * keeps its file date, written just after the shot.
  */
 export async function storedPhotoSecondCheck(db: HotshoeDb): Promise<(at: number) => boolean> {
   // Index keys only: reading the photos themselves would load every image.
@@ -57,7 +58,10 @@ export async function storedPhotoSecondCheck(db: HotshoeDb): Promise<(at: number
   type Key = readonly [EntryId, number];
   const keys = (await db.photos.orderBy('[entryId+takenAt]').keys()) as unknown as Key[];
   const seconds = new Set(keys.map(([, takenAt]) => secondOf(takenAt)));
-  return (at) => seconds.has(secondOf(at));
+  return (at) => {
+    const second = secondOf(at);
+    return seconds.has(second - 1) || seconds.has(second) || seconds.has(second + 1);
+  };
 }
 
 /** Bytes used by all photos, for the storage readout. */
