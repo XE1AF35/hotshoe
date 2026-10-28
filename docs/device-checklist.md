@@ -21,6 +21,8 @@ Automated tests run in WebKit, which is close to iOS Safari but not the same. Ru
 - [ ] **Log with photo**: the camera opens, and the photo joins the new entry.
 - [ ] Add a photo from the library, including a HEIC and a portrait photo: both show the right way up.
 - [ ] Open a photo full screen, pinch to zoom, and share it to Photos.
+- [ ] **From photos** with Camera photos taken as High Efficiency (HEIC) and as Most Compatible (JPEG): each Entry gets the photo's time and location.
+- [ ] **From photos** with the photo picker's Location option turned off, if it has one: the photos come through without a location and can be placed by hand.
 
 ## Copy, export, and backup
 
