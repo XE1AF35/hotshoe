@@ -41,7 +41,7 @@ export function MapEntryCard({
           </h2>
           <p className="text-muted text-sm">{formatLoggedTime(entry.loggedAt, entry)}</p>
           <p className="flex flex-wrap items-center gap-2 text-muted text-sm">
-            <AccuracyPill accuracyM={entry.accuracyM} targetM={accuracyTargetM} />
+            <AccuracyPill entry={entry} targetM={accuracyTargetM} />
             {entry.frame !== null && <span>Frame {entry.frame}</span>}
           </p>
         </div>

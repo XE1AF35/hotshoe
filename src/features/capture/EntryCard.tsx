@@ -5,7 +5,7 @@ import { PhotoStrip } from '../photos/PhotoStrip.tsx';
 import { AccuracyPill } from './AccuracyPill.tsx';
 import { CoordLines } from './CoordLines.tsx';
 import { CopyCoordsButton } from './CopyCoordsButton.tsx';
-import { looksImprecise } from './capture.ts';
+import { isWeakFix, looksImprecise } from './capture.ts';
 import { QuickFields } from './QuickFields.tsx';
 
 export function EntryCard({
@@ -19,7 +19,7 @@ export function EntryCard({
   readonly accuracyTargetM: number;
   readonly heading: string;
 }) {
-  const weak = entry.accuracyM > accuracyTargetM;
+  const weak = isWeakFix(entry.accuracyM, accuracyTargetM);
 
   return (
     <section
@@ -35,7 +35,7 @@ export function EntryCard({
         </h2>
         <CoordLines coords={entry} style={coordStyle} className="font-semibold text-2xl" />
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted text-sm">
-          <AccuracyPill accuracyM={entry.accuracyM} targetM={accuracyTargetM} />
+          <AccuracyPill entry={entry} targetM={accuracyTargetM} />
           {weak && <span className="font-medium text-accent-ink">weak fix</span>}
           <span>{formatLoggedTime(entry.loggedAt, entry)}</span>
         </p>

@@ -19,7 +19,7 @@ function entry(id: string, lat: number, lon: number, tripId: TripId | null): Ent
     altitudeAccuracyM: null,
     label: null,
     frame: null,
-    source: 'gps',
+    origin: 'logged',
     createdAt: 0,
     updatedAt: 0,
   };

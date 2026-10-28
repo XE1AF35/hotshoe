@@ -44,5 +44,18 @@ export class HotshoeDb extends Dexie {
     this.version(4).stores({
       photos: 'id, entryId, [entryId+takenAt], bytes, createdAt',
     });
+    // Entries gain an origin in place of the `source: 'gps'` placeholder. Every entry so far was
+    // logged with a fix, so its accuracy stays as it was.
+    this.version(5)
+      .stores({})
+      .upgrade((tx) =>
+        tx
+          .table('entries')
+          .toCollection()
+          .modify((entry: { origin?: unknown; source?: unknown }) => {
+            entry.origin = 'logged';
+            delete entry.source;
+          }),
+      );
   }
 }

@@ -1,4 +1,5 @@
-import type { EntryId } from '../../db/schema.ts';
+import type { Entry, EntryId } from '../../db/schema.ts';
+import { formatAccuracy } from '../../lib/format.ts';
 
 /** One reading from the Geolocation API, reduced to what an entry stores. */
 export interface Fix {
@@ -163,9 +164,21 @@ export function fixFromPosition(position: GeolocationPosition): Fix {
   };
 }
 
-/** Precise Location turned off gives fixes kilometres wide. */
-export function looksImprecise(accuracyM: number): boolean {
-  return accuracyM > 1000;
+/** Precise Location turned off gives fixes kilometres wide. Unknown accuracy never looks it. */
+export function looksImprecise(accuracyM: number | null): boolean {
+  return accuracyM !== null && accuracyM > 1000;
+}
+
+/** Less accurate than the target. Unknown accuracy is never weak. */
+export function isWeakFix(accuracyM: number | null, targetM: number): boolean {
+  return accuracyM !== null && accuracyM > targetM;
+}
+
+/** `±8 m`, or words when there is no number: `Placed by hand` or `Accuracy unknown`. */
+export function describeAccuracy(entry: Pick<Entry, 'accuracyM' | 'origin'>): string {
+  if (entry.origin === 'placed') return 'Placed by hand';
+  if (entry.accuracyM === null) return 'Accuracy unknown';
+  return formatAccuracy(entry.accuracyM);
 }
 
 /**

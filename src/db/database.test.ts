@@ -60,8 +60,12 @@ describe('HotshoeDb upgrades', () => {
       expect((await listEntries(db)).map((entry) => entry.label)).toEqual(['Wharf']);
       expect(await listPhotos(db, 'e1' as EntryId)).toHaveLength(1);
       expect(await totalPhotoBytes(db)).toBe(550);
-      expect(db.verno).toBe(4);
+      expect(db.verno).toBe(5);
       expect((await db.trips.get('t1' as TripId))?.cameraClock).toBeNull();
+      const entry = await db.entries.get('e1' as EntryId);
+      expect(entry?.origin).toBe('logged');
+      expect(entry?.accuracyM).toBe(5);
+      expect(entry).not.toHaveProperty('source');
     } finally {
       await db.delete();
     }

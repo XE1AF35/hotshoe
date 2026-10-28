@@ -32,7 +32,7 @@ test('exports a logged entry as GPX and as CSV', async ({ page }) => {
   download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Save or share export' }).click();
   const csv = await readFile((await (await download).path()) ?? '', 'utf8');
-  expect(csv).toContain(',-36.840556,174.766389,6,');
+  expect(csv).toContain(',-36.840556,174.766389,logged,6,');
   expect(csv).toContain(',Ferry terminal,');
 });
 
@@ -68,7 +68,7 @@ test('exports only the entries ticked in Select mode', async ({ page, context })
   expect((await download).suggestedFilename()).toMatch(/^hotshoe-selection-\d{8}\.csv$/);
   const csv = await readFile((await (await download).path()) ?? '', 'utf8');
   const rows = csv.trim().split('\r\n').slice(1);
-  expect(rows.map((row) => row.split(',')[8])).toEqual(['First', 'Third']);
+  expect(rows.map((row) => row.split(',')[9])).toEqual(['First', 'Third']);
 
   await page.getByRole('button', { name: 'Done' }).click();
   await expect(page.getByRole('checkbox')).toHaveCount(0);

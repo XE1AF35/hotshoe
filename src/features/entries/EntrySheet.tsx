@@ -6,9 +6,10 @@ import { useDb } from '../../db/DbProvider.tsx';
 import { type DeletedEntry, deleteEntry, updateEntry } from '../../db/entries.ts';
 import { type Entry, limits, type Trip } from '../../db/schema.ts';
 import type { CoordStyle } from '../../lib/coords.ts';
-import { formatAccuracy, formatLoggedTime } from '../../lib/format.ts';
+import { formatLoggedTime } from '../../lib/format.ts';
 import { CoordLines } from '../capture/CoordLines.tsx';
 import { CopyCoordsButton } from '../capture/CopyCoordsButton.tsx';
+import { describeAccuracy } from '../capture/capture.ts';
 import { PhotoStrip } from '../photos/PhotoStrip.tsx';
 import { TripSelect } from '../trips/TripSelect.tsx';
 
@@ -87,7 +88,7 @@ function EntryForm({
       <div className="space-y-1">
         <CoordLines coords={entry} style={coordStyle} className="text-lg" />
         <p className="text-muted text-sm">
-          {formatLoggedTime(entry.loggedAt, entry)} · {formatAccuracy(entry.accuracyM)}
+          {formatLoggedTime(entry.loggedAt, entry)} · {describeAccuracy(entry)}
           {entry.altitudeM !== null && ` · ${Math.round(entry.altitudeM)} m altitude`}
         </p>
       </div>

@@ -54,6 +54,24 @@ describe('EntriesScreen', () => {
     expect(within(earlier).getByText('Wharf')).toBeDefined();
   });
 
+  it('shows unknown accuracy without a number', async () => {
+    const db = createTestDb();
+    await addEntry(db, newEntryInput({ label: 'Wharf', accuracyM: 8 }));
+    await addEntry(db, newEntryInput({ label: 'Cafe', origin: 'photo', accuracyM: null }));
+    await addEntry(db, newEntryInput({ label: 'Beach', origin: 'placed', accuracyM: null }));
+    renderEntries(db);
+
+    const row = async (label: string) => screen.findByRole('button', { name: new RegExp(label) });
+    expect(within(await row('Wharf')).getByText('±8 m')).toBeDefined();
+    expect(within(await row('Cafe')).getByText('Accuracy unknown')).toBeDefined();
+    expect(within(await row('Beach')).getByText('Placed by hand')).toBeDefined();
+
+    fireEvent.click(await row('Cafe'));
+    const sheet = await screen.findByRole('dialog', { name: 'Entry' });
+    expect(within(sheet).getByText(/Accuracy unknown/)).toBeDefined();
+    expect(within(sheet).queryByText(/±/)).toBeNull();
+  });
+
   it('edits an entry in the sheet', async () => {
     const db = createTestDb();
     const trip = await addTrip(db, 'Northland');

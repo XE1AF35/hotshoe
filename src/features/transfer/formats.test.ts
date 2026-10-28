@@ -17,7 +17,7 @@ function entry(overrides: Partial<Entry> & Pick<Entry, 'id' | 'loggedAt'>): Entr
     label: null,
     frame: null,
     tripId: null,
-    source: 'gps',
+    origin: 'logged',
     createdAt: overrides.loggedAt,
     updatedAt: overrides.loggedAt,
     ...overrides,
@@ -28,7 +28,7 @@ const waiheke = 'trip-waiheke' as TripId;
 
 /**
  * Two days on Waiheke (the second crossing midnight in New Zealand but not in UTC), one entry
- * with no trip, and text chosen to trip up each format.
+ * with no trip, one entry of each origin, and text chosen to trip up each format.
  */
 const rows: ExportRow[] = [
   {
@@ -38,7 +38,9 @@ const rows: ExportRow[] = [
       loggedAt: Date.parse('2026-10-14T11:30:00Z'),
       lat: -36.8,
       lon: 175.1,
+      accuracyM: null,
       altitudeM: null,
+      origin: 'placed',
       label: 'Onetangi, "golden hour"\nsecond line',
       tripId: waiheke,
     }),
@@ -61,6 +63,7 @@ const rows: ExportRow[] = [
       id: 'e2' as EntryId,
       loggedAt: Date.parse('2026-10-14T02:00:00Z'),
       accuracyM: 64.25,
+      origin: 'photo',
       label: '=HYPERLINK("http://example.com")',
       frame: '-3',
     }),
@@ -132,7 +135,7 @@ describe('formatExport', () => {
 
   it('writes empty but valid files when there is nothing to export', () => {
     expect(formatExport('csv', [], now)).toBe(
-      '﻿id,logged_at_utc,logged_at_local,time_zone,latitude,longitude,accuracy_m,altitude_m,label,frame,trip,photos\r\n',
+      '﻿id,logged_at_utc,logged_at_local,time_zone,latitude,longitude,origin,accuracy_m,altitude_m,label,frame,trip,photos\r\n',
     );
     expect(JSON.parse(formatExport('geojson', [], now)).features).toEqual([]);
     expect(formatExport('gpx', [], now)).not.toContain('<trk>');

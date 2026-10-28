@@ -64,6 +64,20 @@ function editJson(bytes: Uint8Array, change: (json: LooseBackup) => void) {
   });
 }
 
+/** Rewrites a backup's entries as versions 1 and 2 had them, with `source: 'gps'` and no origin. */
+function asVersion(bytes: Uint8Array, version: 1 | 2) {
+  return editJson(bytes, (json) => {
+    Object.assign(json, { version });
+    for (const saved of json.entries) {
+      delete saved.origin;
+      saved.source = 'gps';
+    }
+    if (version === 1) {
+      for (const saved of json.trips as Record<string, unknown>[]) delete saved.cameraClock;
+    }
+  });
+}
+
 describe('createBackup', () => {
   it('names the file by date and lays out backup.json, photos, and thumbs', async () => {
     const db = createTestDb();
@@ -81,7 +95,7 @@ describe('createBackup', () => {
     const json = JSON.parse(strFromU8(files['backup.json'] ?? new Uint8Array()));
     expect(json).toMatchObject({
       format: 'hotshoe-backup',
-      version: 2,
+      version: 3,
       exportedAt: '2026-10-14T03:12:45.000Z',
     });
     expect(json.photos[0]).not.toHaveProperty('image');
@@ -145,13 +159,38 @@ describe('restoreBackup', () => {
     await restoreBackup(current, readBackup(await backupBytes(source)), 'merge');
     expect((await current.trips.get(trip.id))?.cameraClock).toEqual(clock);
 
-    const older = editJson(await backupBytes(source), (json) => {
-      Object.assign(json, { version: 1 });
-      for (const saved of json.trips as Record<string, unknown>[]) delete saved.cameraClock;
-    });
+    const older = asVersion(await backupBytes(source), 1);
     const fromOlder = createTestDb();
     await restoreBackup(fromOlder, readBackup(older), 'merge');
     expect((await fromOlder.trips.get(trip.id))?.cameraClock).toBeNull();
+  });
+
+  it("keeps each entry's origin and unknown accuracy", async () => {
+    const source = createTestDb();
+    const fromPhoto = await addEntry(source, newEntryInput({ origin: 'photo', accuracyM: null }));
+    const placed = await addEntry(source, newEntryInput({ origin: 'placed', accuracyM: null }));
+
+    const target = createTestDb();
+    await restoreBackup(target, readBackup(await backupBytes(source)), 'merge');
+    expect(await target.entries.get(fromPhoto.id)).toEqual(fromPhoto);
+    expect(await target.entries.get(placed.id)).toEqual(placed);
+  });
+
+  it('restores version 1 and 2 backups with every entry logged', async () => {
+    const source = createTestDb();
+    const { entry, bare } = await seed(source);
+
+    for (const version of [1, 2] as const) {
+      const target = createTestDb();
+      await restoreBackup(
+        target,
+        readBackup(asVersion(await backupBytes(source), version)),
+        'merge',
+      );
+      for (const original of [entry, bare]) {
+        expect(await target.entries.get(original.id)).toEqual({ ...original, origin: 'logged' });
+      }
+    }
   });
 
   it('merges by keeping the more recently edited copy of each entry', async () => {
@@ -262,6 +301,14 @@ describe('readBackup rejects', () => {
     );
     rejects(
       editJson(bytes, (json) => Object.assign(json.entries[0] ?? {}, { extra: 'field' })),
+      /entries\.0/,
+    );
+    rejects(
+      editJson(bytes, (json) => Object.assign(json.entries[0] ?? {}, { origin: 'gps' })),
+      /entries\.0\.origin/,
+    );
+    rejects(
+      editJson(bytes, (json) => Object.assign(json.entries[0] ?? {}, { source: 'gps' })),
       /entries\.0/,
     );
     rejects(

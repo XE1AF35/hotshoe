@@ -59,7 +59,7 @@ export async function createBackup(
 
   const json: BackupJson = {
     format: 'hotshoe-backup',
-    version: 2,
+    version: 3,
     exportedAt: new Date(now).toISOString(),
     trips,
     entries,

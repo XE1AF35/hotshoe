@@ -15,6 +15,15 @@ describe('addEntry', () => {
     expect(await db.entries.get(entry.id)).toEqual(entry);
   });
 
+  it('records a logged origin unless told otherwise, and keeps unknown accuracy', async () => {
+    const db = createTestDb();
+    expect(await addEntry(db, newEntryInput())).toMatchObject({ origin: 'logged', accuracyM: 8 });
+    expect(await addEntry(db, newEntryInput({ origin: 'photo', accuracyM: null }))).toMatchObject({
+      origin: 'photo',
+      accuracyM: null,
+    });
+  });
+
   it('rejects coordinates out of range', async () => {
     const db = createTestDb();
     await expect(addEntry(db, newEntryInput({ lat: 91 }))).rejects.toBeInstanceOf(
@@ -26,6 +35,9 @@ describe('addEntry', () => {
   it('rejects negative accuracy and over-long text', async () => {
     const db = createTestDb();
     await expect(addEntry(db, newEntryInput({ accuracyM: -1 }))).rejects.toThrow('Accuracy');
+    await expect(addEntry(db, newEntryInput({ origin: 'placed', accuracyM: 5 }))).rejects.toThrow(
+      'placed by hand',
+    );
     await expect(addEntry(db, newEntryInput({ frame: 'x'.repeat(41) }))).rejects.toThrow('Frame');
   });
 

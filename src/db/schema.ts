@@ -11,18 +11,25 @@ export interface Entry extends LatLon, TimeContext {
   readonly loggedAt: number;
   /** Epoch ms UTC of the GPS fix itself, which can arrive seconds after the tap. */
   readonly fixAt: number;
-  readonly accuracyM: number;
+  /** Null when unknown, as for a photo with no GPS error figure or an entry placed by hand. */
+  readonly accuracyM: number | null;
   readonly altitudeM: number | null;
   readonly altitudeAccuracyM: number | null;
   readonly label: string | null;
   /** Free text, because frame numbers and file names are not plain integers ("12A", "DSC_0412"). */
   readonly frame: string | null;
   readonly tripId: TripId | null;
-  /** Leaves room for entries placed by hand on the map later. */
-  readonly source: 'gps';
+  readonly origin: Origin;
   readonly createdAt: number;
   readonly updatedAt: number;
 }
+
+/**
+ * Where an entry's location came from: a fix at the tap, the photo's own GPS, or set by hand. It
+ * says nothing about the time.
+ */
+export const origins = ['logged', 'photo', 'placed'] as const;
+export type Origin = (typeof origins)[number];
 
 export interface Trip {
   readonly id: TripId;

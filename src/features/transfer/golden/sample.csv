@@ -1,5 +1,5 @@
-﻿id,logged_at_utc,logged_at_local,time_zone,latitude,longitude,accuracy_m,altitude_m,label,frame,trip,photos
-e1,2026-10-14T01:00:00Z,2026-10-14T14:00:00+13:00,Pacific/Auckland,-36.848461,174.763336,8,12.5,Ōtaki wharf,12A,Waiheke & <Rakino>,p1.jpg p2.jpg
-e2,2026-10-14T02:00:00Z,2026-10-14T15:00:00+13:00,Pacific/Auckland,-36.848461,174.763336,64.3,12.5,"'=HYPERLINK(""http://example.com"")",'-3,,
-e3,2026-10-14T11:30:00Z,2026-10-15T00:30:00+13:00,Pacific/Auckland,-36.800000,175.100000,8,,"Onetangi, ""golden hour""
+﻿id,logged_at_utc,logged_at_local,time_zone,latitude,longitude,origin,accuracy_m,altitude_m,label,frame,trip,photos
+e1,2026-10-14T01:00:00Z,2026-10-14T14:00:00+13:00,Pacific/Auckland,-36.848461,174.763336,logged,8,12.5,Ōtaki wharf,12A,Waiheke & <Rakino>,p1.jpg p2.jpg
+e2,2026-10-14T02:00:00Z,2026-10-14T15:00:00+13:00,Pacific/Auckland,-36.848461,174.763336,photo,64.3,12.5,"'=HYPERLINK(""http://example.com"")",'-3,,
+e3,2026-10-14T11:30:00Z,2026-10-15T00:30:00+13:00,Pacific/Auckland,-36.800000,175.100000,placed,,,"Onetangi, ""golden hour""
 second line",,Waiheke & <Rakino>,

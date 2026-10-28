@@ -36,7 +36,7 @@ function entry(
     label,
     frame: null,
     tripId: tripId as TripId | null,
-    source: 'gps',
+    origin: 'logged',
     createdAt: loggedAt,
     updatedAt: loggedAt,
   };

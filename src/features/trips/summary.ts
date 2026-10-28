@@ -1,7 +1,7 @@
 import type { Entry } from '../../db/schema.ts';
 import type { LatLon } from '../../lib/coords.ts';
 import { type DayKey, localDayKey } from '../../lib/time.ts';
-import { looksImprecise } from '../capture/capture.ts';
+import { isWeakFix, looksImprecise } from '../capture/capture.ts';
 
 /** What a trip summary needs from each entry. */
 export type SummaryEntry = Pick<
@@ -57,7 +57,7 @@ export function summariseTrip(
     days: daySpan(inOrder),
     distanceM,
     impreciseFixes: inOrder.length - measurable.length,
-    weakFixes: entries.filter((entry) => entry.accuracyM > accuracyTargetM).length,
+    weakFixes: entries.filter((entry) => isWeakFix(entry.accuracyM, accuracyTargetM)).length,
   };
 }
 

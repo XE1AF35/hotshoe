@@ -12,6 +12,7 @@ import {
   type EntryId,
   limits,
   newEntryId,
+  type Origin,
   type StoredPhoto,
   type TripId,
 } from './schema.ts';
@@ -20,9 +21,12 @@ import { activeTrip, assertTripOpen } from './trips.ts';
 export interface NewEntry extends LatLon, TimeContext {
   readonly loggedAt: number;
   readonly fixAt: number;
-  readonly accuracyM: number;
+  /** Null when unknown. */
+  readonly accuracyM: number | null;
   readonly altitudeM: number | null;
   readonly altitudeAccuracyM: number | null;
+  /** Left out, the entry was logged with a fix. */
+  readonly origin?: Origin;
   readonly label?: string | null;
   readonly frame?: string | null;
   /** Left out, the entry joins the active trip as it is when saved. Null means no trip. */
@@ -45,8 +49,11 @@ export async function addEntry(db: HotshoeDb, input: NewEntry, now = Date.now())
   if (!isValidLatLon(input)) {
     throw new InvalidInputError('Latitude or longitude is out of range.');
   }
-  if (!Number.isFinite(input.accuracyM) || input.accuracyM < 0) {
+  if (input.accuracyM !== null && (!Number.isFinite(input.accuracyM) || input.accuracyM < 0)) {
     throw new InvalidInputError('Accuracy must be zero or more metres.');
+  }
+  if (input.origin === 'placed' && input.accuracyM !== null) {
+    throw new InvalidInputError('An entry placed by hand has no accuracy.');
   }
 
   const fields = {
@@ -62,10 +69,10 @@ export async function addEntry(db: HotshoeDb, input: NewEntry, now = Date.now())
     altitudeAccuracyM: input.altitudeAccuracyM,
     label: normaliseText(input.label, limits.labelLength, 'Label'),
     frame: normaliseText(input.frame, limits.frameLength, 'Frame'),
-    source: 'gps',
+    origin: input.origin ?? 'logged',
     createdAt: now,
     updatedAt: now,
-  } as const;
+  };
 
   return withStorageErrors(() =>
     db.transaction('rw', db.entries, db.trips, db.meta, async () => {

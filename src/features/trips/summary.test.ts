@@ -132,6 +132,17 @@ describe('summariseTrip', () => {
     );
     expect(summary.weakFixes).toBe(2);
   });
+
+  it('never counts unknown accuracy as weak or imprecise, and measures to it', () => {
+    const summary = summariseTrip(
+      [entry({ loggedAt: 1, ...auckland }), entry({ loggedAt: 2, ...auckland, accuracyM: null })],
+      0,
+      20,
+    );
+    expect(summary.weakFixes).toBe(0);
+    expect(summary.impreciseFixes).toBe(0);
+    expect(summary.distanceM).toBe(0);
+  });
 });
 
 describe('greatCircleM', () => {
