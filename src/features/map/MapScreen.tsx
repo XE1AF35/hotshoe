@@ -1,36 +1,18 @@
-import {
-  Component,
-  lazy,
-  type ReactNode,
-  Suspense,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import { MapIcon } from '../../app/icons.tsx';
+import { lazy, Suspense, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useDetail } from '../../app/router.ts';
 import { ScreenHeader } from '../../app/ScreenHeader.tsx';
-import { useDb } from '../../db/DbProvider.tsx';
 import { useEntries, useTrips } from '../../db/hooks.ts';
 import { useSettings } from '../../db/SettingsProvider.tsx';
 import type { EntryId } from '../../db/schema.ts';
-import { coordStyleOf, setSetting } from '../../db/settings.ts';
+import { coordStyleOf } from '../../db/settings.ts';
 import { MapEntryCard } from './MapEntryCard.tsx';
 import type { MapFocus } from './MapView.tsx';
+import { MapErrorBoundary, MapGate, useMapLoad } from './mapLoading.tsx';
 import { entryPoints, type TripFilter } from './points.ts';
 
 const MapView = lazy(() => import('./MapView.tsx'));
 
-/**
- * Once the map has been loaded it stays loaded until Hotshoe is closed, so moving between tabs
- * doesn't ask again.
- */
-let loadedThisVisit = false;
-
 export function MapScreen() {
-  const db = useDb();
   const entries = useEntries();
   const trips = useTrips();
   const settings = useSettings();
@@ -39,8 +21,7 @@ export function MapScreen() {
   const [filter, setFilter] = useState<TripFilter>('all');
   const [selectedId, setSelectedId] = useState<EntryId | null>(null);
   const [focus, setFocus] = useState<MapFocus | null>(null);
-  const [loadRequested, setLoadRequested] = useState(loadedThisVisit);
-  const showMap = loadRequested || settings.mapLoadsAutomatically;
+  const { showMap, load } = useMapLoad();
 
   const points = useMemo(() => entryPoints(entries ?? [], filter), [entries, filter]);
   const selected = entries?.find((entry) => entry.id === selectedId) ?? null;
@@ -102,13 +83,9 @@ export function MapScreen() {
         <div className="relative min-h-80 flex-1 overflow-hidden rounded-3xl bg-raised shadow-sm ring-1 ring-line">
           {settings !== undefined && entries !== undefined && !showMap && (
             <MapGate
-              shown={points.collection.features.length}
+              heading={`${entryCount(points.collection.features.length)} to show`}
               centred={selected === null}
-              onLoad={(always) => {
-                loadedThisVisit = true;
-                setLoadRequested(true);
-                if (always) void setSetting(db, 'mapLoadsAutomatically', true);
-              }}
+              onLoad={load}
             />
           )}
           {showMap && entries !== undefined && (
@@ -149,76 +126,6 @@ export function MapScreen() {
   );
 }
 
-/**
- * Asks before loading the map, because loading it shows OpenFreeMap the area on screen. The
- * map's code isn't even fetched until then.
- */
-function MapGate({
-  shown,
-  centred,
-  onLoad,
-}: {
-  readonly shown: number;
-  /** Centred when there is room; at the top when an entry card fills the bottom. */
-  readonly centred: boolean;
-  readonly onLoad: (always: boolean) => void;
-}) {
-  const alwaysId = useId();
-  const [always, setAlways] = useState(false);
-  return (
-    <div
-      className={`absolute inset-0 flex flex-col items-center gap-3 p-6 text-center ${
-        centred ? 'justify-center' : 'justify-start'
-      }`}
-    >
-      <MapIcon className="size-10 text-muted" />
-      <p className="font-semibold">{entryCount(shown)} to show</p>
-      <p className="max-w-xs text-muted text-sm">
-        The map comes from OpenFreeMap. Loading it shows OpenFreeMap the area you're looking at and
-        your internet address, but never your entries.
-      </p>
-      <button
-        type="button"
-        onClick={() => onLoad(always)}
-        className="min-h-12 rounded-xl bg-accent px-8 font-semibold text-on-accent"
-      >
-        Load map
-      </button>
-      <label htmlFor={alwaysId} className="flex min-h-11 items-center gap-2 text-sm">
-        <input
-          id={alwaysId}
-          type="checkbox"
-          checked={always}
-          onChange={(event) => setAlways(event.target.checked)}
-          className="size-5 accent-accent-ink"
-        />
-        Always load without asking
-      </label>
-    </div>
-  );
-}
-
 function entryCount(shown: number): string {
   return `${shown} ${shown === 1 ? 'entry' : 'entries'}`;
-}
-
-/** If the map's code can't load, say so here rather than losing the whole app. */
-class MapErrorBoundary extends Component<{ readonly children: ReactNode }, { failed: boolean }> {
-  override state = { failed: false };
-
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-
-  override render() {
-    if (!this.state.failed) return this.props.children;
-    return (
-      <p
-        role="alert"
-        className="absolute inset-x-3 top-3 rounded-2xl bg-warning p-3 text-on-warning text-sm"
-      >
-        The map couldn't load. Close Hotshoe and open it again to retry.
-      </p>
-    );
-  }
 }

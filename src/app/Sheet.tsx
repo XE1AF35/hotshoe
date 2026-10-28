@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useId, useRef } from 'react';
+import { type ReactNode, useEffect, useId, useLayoutEffect, useRef } from 'react';
 import { CloseIcon } from './icons.tsx';
 
 /**
@@ -25,6 +25,15 @@ export function Sheet({
     if (open && !dialog.open) dialog.showModal();
     if (!open && dialog.open) dialog.close();
   }, [open]);
+
+  // A sheet taken away while open still closes, while it is in the page, so focus goes back to
+  // whatever opened it.
+  useLayoutEffect(() => {
+    const dialog = ref.current;
+    return () => {
+      if (dialog?.open) dialog.close();
+    };
+  }, []);
 
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents: keyboards close the dialog with Escape (native) or the Close button; the click only handles taps on the backdrop.

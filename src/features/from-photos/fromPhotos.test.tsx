@@ -1,15 +1,15 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { HotshoeDb } from '../../db/database.ts';
-import { listEntries } from '../../db/entries.ts';
+import { addEntry, listEntries } from '../../db/entries.ts';
 import { StorageFullError } from '../../db/errors.ts';
 import * as photosRepo from '../../db/photos.ts';
 import { listPhotos } from '../../db/photos.ts';
 import type { Entry } from '../../db/schema.ts';
-import { setSetting } from '../../db/settings.ts';
+import { getSettings, setSetting } from '../../db/settings.ts';
 import { addTrip, setActiveTrip } from '../../db/trips.ts';
 import { offsetOnlyZone } from '../../lib/time.ts';
-import { createTestDb } from '../../test/db.ts';
+import { createTestDb, newEntryInput } from '../../test/db.ts';
 import { type ExifFields, jpegWithExif } from '../../test/exif.ts';
 import { renderWithDb } from '../../test/render.tsx';
 import { LogScreen } from '../capture/LogScreen.tsx';
@@ -24,6 +24,25 @@ vi.mock('../../lib/image.ts', async (importOriginal) => ({
     height: 1200,
     takenAt: file.lastModified,
   })),
+}));
+
+// MapLibre needs WebGL, which jsdom-style environments lack. This stands in for the pin map: it
+// says where it opened and drops a pin on a tap. The real map is covered in map.spec.ts.
+vi.mock('../map/PinMap.tsx', () => ({
+  default: ({
+    center,
+    onPin,
+  }: {
+    readonly center: { readonly lat: number; readonly lon: number } | null;
+    readonly onPin: (pin: { lat: number; lon: number }) => void;
+  }) => (
+    <div>
+      <p>Opened at {center ? `${center.lat}, ${center.lon}` : 'the whole world'}</p>
+      <button type="button" onClick={() => onPin({ lat: -36.8406, lon: 174.7664 })}>
+        Drop pin at the ferry terminal
+      </button>
+    </div>
+  ),
 }));
 
 beforeEach(() => {
@@ -72,12 +91,38 @@ function photoFile(
 const noFileDate = 0;
 
 async function pick(db: HotshoeDb, files: File[]) {
-  const { container } = renderWithDb(db, <LogScreen />);
+  renderWithDb(db, <LogScreen />);
+  // The file input that the tap opens, as the photo library would.
+  let opened: HTMLInputElement | null = null;
+  const click = vi.spyOn(HTMLInputElement.prototype, 'click').mockImplementation(function (
+    this: HTMLInputElement,
+  ) {
+    opened = this;
+  });
   fireEvent.click(await screen.findByRole('button', { name: 'From photos' }));
-  const input = container.querySelector('input[multiple]');
-  if (!input) throw new Error('library input missing');
-  fireEvent.change(input, { target: { files } });
+  click.mockRestore();
+  if (!opened) throw new Error('From photos opened no input');
+  fireEvent.change(opened, { target: { files } });
   return screen.findByRole('dialog', { name: 'From photos' });
+}
+
+/** Shot in Auckland on 14 October 2026, with no location. */
+function shotAt(time: string): ExifFields {
+  return { dateTimeOriginal: `2026:10:14 ${time}`, offsetTimeOriginal: '+13:00' };
+}
+
+async function openPinSheet(sheet: HTMLElement, name: string) {
+  fireEvent.click(await within(sheet).findByRole('button', { name: `Place on map for ${name}` }));
+  return screen.findByRole('dialog', { name: 'Place on map' });
+}
+
+/** Opens the map for a row and closes it again, saying where it opened. */
+async function mapOpenedAt(sheet: HTMLElement, name: string) {
+  const pinSheet = await openPinSheet(sheet, name);
+  const text = (await within(pinSheet).findByText(/Opened at/)).textContent;
+  fireEvent.click(within(pinSheet).getByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Place on map' })).toBeNull());
+  return text;
 }
 
 /** The file names of the rows, top to bottom. */
@@ -348,6 +393,113 @@ describe('From photos', () => {
         altitudeM: null,
       });
     }
+  });
+
+  it('places a photo with no location by dropping a pin, after asking to load the map', async () => {
+    const db = createTestDb();
+    const sheet = await pick(db, [photoFile('IMG_0001.JPG', shotAt('10:40:00'))]);
+
+    const pinSheet = await openPinSheet(sheet, 'IMG_0001.JPG');
+    expect(within(pinSheet).queryByRole('button', { name: /Drop pin/ })).toBeNull();
+    const placeHere = within(pinSheet).getByRole('button', { name: 'Place here' });
+    expect(placeHere).toHaveProperty('disabled', true);
+
+    fireEvent.click(within(pinSheet).getByRole('button', { name: 'Load map' }));
+    fireEvent.click(await within(pinSheet).findByRole('button', { name: /Drop pin/ }));
+    fireEvent.click(placeHere);
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Place on map' })).toBeNull());
+    expect(screen.getByRole('dialog', { name: 'From photos' })).toBe(sheet);
+    within(sheet).getByRole('checkbox', { name: /IMG_0001.*Placed by hand/ });
+    expect(within(sheet).getByLabelText('Coordinates for IMG_0001.JPG')).toHaveProperty(
+      'value',
+      '-36.840600, 174.766400',
+    );
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Add 1 entry' }));
+
+    await screen.findByText('Added 1 entry.');
+    expect(await listEntries(db)).toEqual([
+      expect.objectContaining({
+        origin: 'placed',
+        lat: -36.8406,
+        lon: 174.7664,
+        accuracyM: null,
+        altitudeM: null,
+      }),
+    ]);
+  });
+
+  it('leaves a photo unplaced when the map is closed without placing it', async () => {
+    const db = createTestDb();
+    await setSetting(db, 'mapLoadsAutomatically', true);
+    const sheet = await pick(db, [photoFile('IMG_0001.JPG', shotAt('10:40:00'))]);
+
+    const pinSheet = await openPinSheet(sheet, 'IMG_0001.JPG');
+    // Set to load without asking, so there is no Load map button.
+    expect(within(pinSheet).queryByRole('button', { name: 'Load map' })).toBeNull();
+    fireEvent.click(await within(pinSheet).findByRole('button', { name: /Drop pin/ }));
+    within(pinSheet).getByText('Pin at -36.840600, 174.766400');
+    fireEvent.click(within(pinSheet).getByRole('button', { name: 'Cancel' }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Place on map' })).toBeNull());
+    expect(screen.getByRole('dialog', { name: 'From photos' })).toBe(sheet);
+    within(sheet).getByRole('checkbox', { name: /IMG_0001.*No location/ });
+    expect(within(sheet).getByRole('button', { name: 'Add 1 entry' })).toHaveProperty(
+      'disabled',
+      true,
+    );
+  });
+
+  it('remembers to load the map without asking when that is ticked', async () => {
+    const db = createTestDb();
+    const sheet = await pick(db, [photoFile('IMG_0001.JPG', shotAt('10:40:00'))]);
+
+    const pinSheet = await openPinSheet(sheet, 'IMG_0001.JPG');
+    fireEvent.click(within(pinSheet).getByLabelText('Always load without asking'));
+    fireEvent.click(within(pinSheet).getByRole('button', { name: 'Load map' }));
+
+    await within(pinSheet).findByRole('button', { name: /Drop pin/ });
+    await waitFor(async () => expect((await getSettings(db)).mapLoadsAutomatically).toBe(true));
+  });
+
+  it('opens the map on the nearest photo with a location, placed ones included', async () => {
+    const db = createTestDb();
+    await setSetting(db, 'mapLoadsAutomatically', true);
+    await addEntry(db, newEntryInput({ lat: -41.2865, lon: 174.7762 }));
+    const sheet = await pick(db, [
+      photoFile('IMG_0000.JPG', shotAt('10:00:00')),
+      photoFile('IMG_0001.JPG', harbour),
+      photoFile('IMG_0002.JPG', shotAt('10:45:00')),
+      photoFile('IMG_0003.JPG', shotAt('10:50:00')),
+    ]);
+    await within(sheet).findAllByRole('checkbox');
+    const harbourCentre = /^Opened at -36\.8484\d*, 174\.7633/;
+    expect(await mapOpenedAt(sheet, 'IMG_0000.JPG')).toMatch(harbourCentre);
+    expect(await mapOpenedAt(sheet, 'IMG_0003.JPG')).toMatch(harbourCentre);
+
+    fireEvent.change(within(sheet).getByLabelText('Coordinates for IMG_0002.JPG'), {
+      target: { value: '-36.9, 174.8' },
+    });
+    expect(await mapOpenedAt(sheet, 'IMG_0003.JPG')).toBe('Opened at -36.9, 174.8');
+  });
+
+  it('opens the map on the last entry when no photo has a location', async () => {
+    const db = createTestDb();
+    await setSetting(db, 'mapLoadsAutomatically', true);
+    await addEntry(db, newEntryInput({ lat: -41.2865, lon: 174.7762 }));
+    const sheet = await pick(db, [photoFile('IMG_0001.JPG', shotAt('11:00:00'))]);
+    await within(sheet).findByRole('checkbox');
+
+    expect(await mapOpenedAt(sheet, 'IMG_0001.JPG')).toBe('Opened at -41.2865, 174.7762');
+  });
+
+  it('opens the map on the whole world when there is nowhere to start', async () => {
+    const db = createTestDb();
+    await setSetting(db, 'mapLoadsAutomatically', true);
+    const sheet = await pick(db, [photoFile('IMG_0001.JPG', shotAt('11:00:00'))]);
+    await within(sheet).findByRole('checkbox');
+
+    expect(await mapOpenedAt(sheet, 'IMG_0001.JPG')).toBe('Opened at the whole world');
   });
 
   it('adds to no trip when that is chosen', async () => {

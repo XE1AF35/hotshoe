@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { Sheet } from '../../app/Sheet.tsx';
 import { useDb } from '../../db/DbProvider.tsx';
-import { useActiveTrip, useTrips } from '../../db/hooks.ts';
+import { useActiveTrip, useLatestEntry, useTrips } from '../../db/hooks.ts';
 import { useSettings } from '../../db/SettingsProvider.tsx';
 import type { TripId } from '../../db/schema.ts';
 import { coordStyleOf } from '../../db/settings.ts';
@@ -19,6 +19,7 @@ import {
   readPhotoDraft,
   typedTime,
 } from './draft.ts';
+import { PlaceOnMapSheet } from './PlaceOnMapSheet.tsx';
 import { type SaveResult, saveDrafts } from './save.ts';
 
 interface Row {
@@ -30,7 +31,7 @@ interface Row {
   readonly typed: string;
   /** The coordinates field's value, for a photo whose location couldn't be found. */
   readonly coordsText: string;
-  /** A location copied from another row, kept exact while the field still shows it. */
+  /** A location copied from another row or dropped on the map, kept exact while the field shows it. */
   readonly copied: { readonly text: string; readonly coords: LatLon } | null;
 }
 
@@ -50,12 +51,15 @@ export function FromPhotosSheet({
   const settings = useSettings();
   const trips = useTrips();
   const activeTrip = useActiveTrip();
+  const latestEntry = useLatestEntry();
   const tripSelectId = useId();
   const [deviceZone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
   // In picked order; shown in time order, which can change as times are typed.
   const [picked, setPicked] = useState<readonly Row[] | null>(null);
   const [chosenTrip, setChosenTrip] = useState<TripId | null | undefined>(undefined);
   const [saving, setSaving] = useState(false);
+  // The key of the row being placed on the map, if any.
+  const [pinningKey, setPinningKey] = useState<number | null>(null);
 
   useEffect(() => {
     let current = true;
@@ -87,6 +91,8 @@ export function FromPhotosSheet({
   const unplaced = ticked.some(({ draft }) => draft.location === null);
   const canConfirm = ticked.length > 0 && ticked.every(({ draft }) => isComplete(draft)) && !saving;
 
+  const pinningRow = rows?.find((row) => row.key === pinningKey);
+
   function change(
     key: number,
     update: Partial<Pick<Row, 'ticked' | 'typed' | 'coordsText' | 'copied'>>,
@@ -106,76 +112,92 @@ export function FromPhotosSheet({
     if (!saving) onDone(null);
   }
 
+  function place(key: number, coords: LatLon) {
+    const text = formatCoords(coords, coordStyle);
+    change(key, { coordsText: text, copied: { text, coords } });
+  }
+
   return (
-    <Sheet open onClose={cancel} title="From photos">
-      {rows === null || trips === undefined || activeTrip === undefined ? (
-        <p role="status">Reading photos…</p>
-      ) : (
-        <>
-          <ul aria-label="Photos" className="space-y-2">
-            {rows.map((row, index) => {
-              const previous = previousLocation(rows, index);
-              return (
-                <li key={row.key}>
-                  <DraftRow
-                    row={row}
-                    disabled={saving}
-                    coordStyle={coordStyle}
-                    onToggle={() => change(row.key, { ticked: !row.ticked })}
-                    onType={(typed) => change(row.key, { typed })}
-                    onCoordsChange={(coordsText) => change(row.key, { coordsText })}
-                    onSameAsPrevious={
-                      previous &&
-                      (() => {
-                        const text = formatCoords(previous, coordStyle);
-                        change(row.key, { coordsText: text, copied: { text, coords: previous } });
-                      })
-                    }
-                  />
-                </li>
-              );
-            })}
-          </ul>
+    <>
+      <Sheet open onClose={cancel} title="From photos">
+        {rows === null || trips === undefined || activeTrip === undefined ? (
+          <p role="status">Reading photos…</p>
+        ) : (
+          <>
+            <ul aria-label="Photos" className="space-y-2">
+              {rows.map((row, index) => {
+                const previous = previousLocation(rows, index);
+                return (
+                  <li key={row.key}>
+                    <DraftRow
+                      row={row}
+                      disabled={saving}
+                      coordStyle={coordStyle}
+                      onToggle={() => change(row.key, { ticked: !row.ticked })}
+                      onType={(typed) => change(row.key, { typed })}
+                      onCoordsChange={(coordsText) => change(row.key, { coordsText })}
+                      onSameAsPrevious={previous && (() => place(row.key, previous))}
+                      onPlaceOnMap={() => setPinningKey(row.key)}
+                    />
+                  </li>
+                );
+              })}
+            </ul>
 
-          <div className="space-y-1">
-            <label htmlFor={tripSelectId} className="font-medium text-sm">
-              Trip
-            </label>
-            <TripSelect id={tripSelectId} trips={trips} value={tripId} onChange={setChosenTrip} />
-          </div>
+            <div className="space-y-1">
+              <label htmlFor={tripSelectId} className="font-medium text-sm">
+                Trip
+              </label>
+              <TripSelect id={tripSelectId} trips={trips} value={tripId} onChange={setChosenTrip} />
+            </div>
 
-          {untimed && (
-            <p className="text-accent-ink text-sm">
-              Type the date and time for each photo with none, or untick it.
-            </p>
-          )}
-          {unplaced && (
-            <p className="text-accent-ink text-sm">
-              Place each photo with no location, or untick it.
-            </p>
-          )}
+            {untimed && (
+              <p className="text-accent-ink text-sm">
+                Type the date and time for each photo with none, or untick it.
+              </p>
+            )}
+            {unplaced && (
+              <p className="text-accent-ink text-sm">
+                Place each photo with no location, or untick it.
+              </p>
+            )}
 
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={cancel}
-              disabled={saving}
-              className="min-h-12 rounded-xl border border-line font-medium disabled:opacity-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => void confirm()}
-              disabled={!canConfirm}
-              className="min-h-12 rounded-xl bg-accent px-3 font-semibold text-on-accent disabled:opacity-50"
-            >
-              {saving ? 'Adding…' : `Add ${formatCount(ticked.length, 'entry', 'entries')}`}
-            </button>
-          </div>
-        </>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={cancel}
+                disabled={saving}
+                className="min-h-12 rounded-xl border border-line font-medium disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => void confirm()}
+                disabled={!canConfirm}
+                className="min-h-12 rounded-xl bg-accent px-3 font-semibold text-on-accent disabled:opacity-50"
+              >
+                {saving ? 'Adding…' : `Add ${formatCount(ticked.length, 'entry', 'entries')}`}
+              </button>
+            </div>
+          </>
+        )}
+      </Sheet>
+      {/* A sibling, not a child, so closing it doesn't reach the review sheet's onClose. */}
+      {rows && pinningRow && (
+        <PlaceOnMapSheet
+          fileName={pinningRow.draft.file.name}
+          initialPin={pinningRow.draft.location}
+          center={nearestLocation(rows, rows.indexOf(pinningRow)) ?? latestEntry ?? null}
+          coordStyle={coordStyle}
+          onPlace={(pin) => {
+            place(pinningRow.key, pin);
+            setPinningKey(null);
+          }}
+          onClose={() => setPinningKey(null)}
+        />
       )}
-    </Sheet>
+    </>
   );
 }
 
@@ -191,6 +213,7 @@ function DraftRow({
   onType,
   onCoordsChange,
   onSameAsPrevious,
+  onPlaceOnMap,
 }: {
   readonly row: Row;
   readonly disabled: boolean;
@@ -200,6 +223,7 @@ function DraftRow({
   readonly onCoordsChange: (coordsText: string) => void;
   /** Null when no earlier row has a location to copy. */
   readonly onSameAsPrevious: (() => void) | null;
+  readonly onPlaceOnMap: () => void;
 }) {
   const thumb = useObjectUrl(row.draft.file);
   const timeFieldId = useId();
@@ -291,6 +315,14 @@ function DraftRow({
               {coordsProblem}
             </p>
           )}
+          <button
+            type="button"
+            onClick={onPlaceOnMap}
+            disabled={disabled}
+            className="min-h-12 w-full rounded-xl border border-line px-3 font-medium disabled:opacity-50"
+          >
+            Place on map<span className="sr-only"> for {file.name}</span>
+          </button>
           {onSameAsPrevious && (
             <button
               type="button"
@@ -335,6 +367,16 @@ function withPlacement(row: Row): Row {
 function previousLocation(rows: readonly Row[], index: number): DraftLocation | null {
   for (let i = index - 1; i >= 0; i -= 1) {
     const location = rows[i]?.draft.location;
+    if (location) return location;
+  }
+  return null;
+}
+
+/** The location of the row nearest this one, in shown order, that has one; the earlier on a tie. */
+function nearestLocation(rows: readonly Row[], index: number): DraftLocation | null {
+  for (let distance = 1; distance < rows.length; distance += 1) {
+    const location =
+      rows[index - distance]?.draft.location ?? rows[index + distance]?.draft.location;
     if (location) return location;
   }
   return null;

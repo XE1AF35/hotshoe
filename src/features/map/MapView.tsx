@@ -1,23 +1,9 @@
 // Loaded only when the Map tab opens: MapLibre is far larger than the rest of the app.
-import 'maplibre-gl/dist/maplibre-gl.css';
-import {
-  AttributionControl,
-  type GeoJSONSource,
-  type LngLatBoundsLike,
-  Map as MapLibreMap,
-  NavigationControl,
-  setWorkerUrl,
-} from 'maplibre-gl';
-import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
+import type { GeoJSONSource, LngLatBoundsLike, Map as MapLibreMap } from 'maplibre-gl';
 import { useEffect, useRef, useState } from 'react';
 import type { EntryId } from '../../db/schema.ts';
-import { currentTheme, onThemeChange } from '../../lib/theme.ts';
-import { mapStyleUrl } from './mapConfig.ts';
+import { createMap, type MapStart, token, wholeWorld } from './mapSetup.ts';
 import type { Points } from './points.ts';
-
-// MapLibre looks for its worker beside its own file, which bundling moves. This points it at the
-// copy Vite emits, served from this origin so the Content Security Policy allows it.
-setWorkerUrl(workerUrl);
 
 const sourceId = 'entries';
 const layers = {
@@ -63,40 +49,14 @@ export default function MapView({
     const element = container.current;
     if (!element) return;
 
-    let map: MapLibreMap;
-    try {
-      map = new MapLibreMap({
-        container: element,
-        style: mapStyleUrl(currentTheme() === 'dark'),
-        ...initialView(latest.current.points.bounds),
-        attributionControl: false,
-        maxZoom: 18,
-      });
-    } catch {
-      setProblem("The map can't be shown on this device.");
-      return;
-    }
+    const made = createMap(element, initialView(latest.current.points.bounds), setProblem);
+    if (!made) return;
+    const { map } = made;
     mapRef.current = map;
-    map.addControl(new NavigationControl({ showCompass: false }), 'top-right');
-    // Top left, so the entry card never covers the OpenStreetMap credit. It starts open and
-    // folds into a button once the map is moved.
-    map.addControl(new AttributionControl({ compact: true }), 'top-left');
-
-    let styleLoaded = false;
     // Runs on the first load and after every style change, which removes added layers.
-    map.on('style.load', () => {
-      styleLoaded = true;
-      setProblem(null);
-      addEntryLayers(map, latest.current.points, latest.current.selectedId);
-    });
-    map.on('error', () => {
-      // Missing tiles are expected offline; only a style that never loaded leaves a blank map.
-      if (!styleLoaded) {
-        setProblem(
-          "The map couldn't load. It needs an internet connection to show an area for the first time.",
-        );
-      }
-    });
+    map.on('style.load', () =>
+      addEntryLayers(map, latest.current.points, latest.current.selectedId),
+    );
 
     map.on('click', (event) => {
       const { x, y } = event.point;
@@ -122,13 +82,8 @@ export default function MapView({
       }
     });
 
-    const stopFollowingTheme = onThemeChange((theme) =>
-      map.setStyle(mapStyleUrl(theme === 'dark'), { diff: false }),
-    );
-
     return () => {
-      stopFollowingTheme();
-      map.remove();
+      made.remove();
       mapRef.current = null;
     };
   }, []);
@@ -180,19 +135,13 @@ export default function MapView({
 
 const fitOptions = { padding: 56, maxZoom: 15 } as const;
 
-function initialView(bounds: Points['bounds']) {
+function initialView(bounds: Points['bounds']): MapStart {
   if (bounds) return { bounds: bounds as LngLatBoundsLike, fitBoundsOptions: fitOptions };
-  // Nothing logged yet: the whole world.
-  return { center: [0, 20] as [number, number], zoom: 1 };
+  return wholeWorld;
 }
 
 function selectedFilter(id: EntryId | null) {
   return ['==', ['get', 'id'], id ?? ''] as ['==', ['get', string], string];
-}
-
-/** The app's colour tokens, read from the stylesheet so the map matches light and dark mode. */
-function token(name: string): string {
-  return getComputedStyle(document.documentElement).getPropertyValue(`--${name}`).trim();
 }
 
 function addEntryLayers(map: MapLibreMap, points: Points, selectedId: EntryId | null) {
