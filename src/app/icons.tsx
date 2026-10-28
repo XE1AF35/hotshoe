@@ -129,3 +129,14 @@ export function ChevronIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/** Two places joined by a winding line, for the Trail. */
+export function TrailIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <circle cx="5" cy="18" r="2" />
+      <circle cx="19" cy="6" r="2" />
+      <path d="M7 18h6a3 3 0 0 0 0-6h-2a3 3 0 0 1 0-6h6" />
+    </Svg>
+  );
+}

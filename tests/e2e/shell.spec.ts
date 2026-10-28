@@ -1,16 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
-import { expect, type Page, test } from '@playwright/test';
-
-function collectErrors(page: Page): string[] {
-  const errors: string[] = [];
-  page.on('console', (message) => {
-    if (message.type() === 'error') errors.push(message.text());
-  });
-  page.on('pageerror', (error) => {
-    errors.push(error.message);
-  });
-  return errors;
-}
+import { expect, test } from '@playwright/test';
+import { collectErrors } from './helpers.ts';
 
 test('opens on Log and moves between tabs without errors', async ({ page }) => {
   const errors = collectErrors(page);

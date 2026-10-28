@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 import { addExif } from '../../src/test/exif.ts';
-import { cameraJpeg } from './helpers.ts';
+import { cameraJpeg, collectErrors } from './helpers.ts';
 
 const wharf = { latitude: -36.840556, longitude: 174.766389, accuracy: 6 };
 
@@ -240,6 +240,8 @@ test("opens a Day's map after asking, and a pin opens its entry", async ({ page 
   await expect(canvas).toBeVisible();
   await expect(box.getByRole('status')).toHaveText('1 entry on the map');
   await expect(box.locator('.maplibregl-ctrl-attrib')).toBeAttached();
+  // One pin has nothing to join.
+  await expect(box.getByRole('button', { name: 'Trail' })).toHaveCount(0);
 
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
@@ -328,4 +330,51 @@ test('a plain mouse wheel over a Day map shows the two-finger hint and leaves it
   // The same wheel with the modifier does zoom, which shows the pictures would catch it.
   await wheel({ ctrlKey: true, metaKey: true });
   await expect.poll(async () => (await picture()).equals(before)).toBe(false);
+});
+
+test('the Trail button shows with two pins and turns the Trail on and off', async ({ page }) => {
+  await stubMapTiles(page);
+  const errors = collectErrors(page);
+  const violations = await watchPolicyViolations(page);
+  const nav = page.getByRole('navigation', { name: 'Main' });
+  await logEntry(page, 'Ferry terminal');
+
+  // One pin on the Map tab: no Trail to offer.
+  await nav.getByRole('link', { name: 'Map' }).click();
+  await page.getByRole('button', { name: 'Load map' }).click();
+  await expect(page.locator('canvas.maplibregl-canvas')).toBeVisible();
+  await expect(page.getByRole('status').filter({ hasText: 'on the map' })).toHaveText(
+    '1 entry on the map',
+  );
+  await expect(page.getByRole('button', { name: 'Trail' })).toHaveCount(0);
+
+  // A second pin, a few streets away, brings the button, off to start with.
+  await page.context().setGeolocation({ latitude: -36.848, longitude: 174.762, accuracy: 6 });
+  await nav.getByRole('link', { name: 'Log' }).click();
+  await page.getByRole('button', { name: 'Log location' }).click();
+  await expect(page.getByRole('heading', { name: 'Logged' })).toBeVisible();
+  await nav.getByRole('link', { name: 'Map' }).click();
+  const mapTrail = page.getByRole('button', { name: 'Trail' });
+  await expect(mapTrail).toHaveAttribute('aria-pressed', 'false');
+  await mapTrail.click();
+  await expect(mapTrail).toHaveAttribute('aria-pressed', 'true');
+  // Long enough for the draw-in to finish.
+  await page.waitForTimeout(2500);
+  await mapTrail.click();
+  await expect(mapTrail).toHaveAttribute('aria-pressed', 'false');
+
+  // The same on a Day map, which starts with the Trail off.
+  await nav.getByRole('link', { name: 'Entries' }).click();
+  await page.locator('main h2 button').first().click();
+  const box = page.getByRole('region', { name: /^Map of/ });
+  await expect(box.getByRole('status')).toHaveText('2 entries on the map');
+  const dayTrail = box.getByRole('button', { name: 'Trail' });
+  await expect(dayTrail).toHaveAttribute('aria-pressed', 'false');
+  await dayTrail.click();
+  await expect(dayTrail).toHaveAttribute('aria-pressed', 'true');
+  await dayTrail.click();
+  await expect(dayTrail).toHaveAttribute('aria-pressed', 'false');
+
+  expect(errors).toEqual([]);
+  expect(await violations()).toEqual([]);
 });

@@ -1,17 +1,40 @@
 // Loaded only with a map, on the Map tab or a Day map: MapLibre is far larger than the rest of the app.
-import type { GeoJSONSource, LngLatBoundsLike, Map as MapLibreMap } from 'maplibre-gl';
+import type { FeatureCollection } from 'geojson';
+import type {
+  ExpressionSpecification,
+  GeoJSONSource,
+  LngLatBoundsLike,
+  Map as MapLibreMap,
+} from 'maplibre-gl';
 import { useEffect, useRef, useState } from 'react';
+import { TrailIcon } from '../../app/icons.tsx';
 import type { EntryId } from '../../db/schema.ts';
 import { createMap, type MapStart, token, wholeWorld } from './mapSetup.ts';
 import type { Points } from './points.ts';
+import type { Trail } from './trail.ts';
 
 const sourceId = 'entries';
+const trailSourceId = 'trail';
 const layers = {
+  trailEdge: 'trail-edge',
+  trail: 'trail',
   clusters: 'entry-clusters',
   clusterCounts: 'entry-cluster-counts',
   points: 'entry-points',
   selected: 'entry-selected',
 } as const;
+
+/** How long the Trail takes to draw itself, however long it is. */
+const trailDrawMs = 2000;
+
+/**
+ * The Trail's two lines: a wider dark edge, so it stands out on light and dark maps and from the
+ * yellow pins, under the amber line. On-accent is dark in both themes, unlike accent-ink.
+ */
+const trailLayers = [
+  { id: layers.trailEdge, token: 'on-accent', width: 7 },
+  { id: layers.trail, token: 'accent', width: 4 },
+] as const;
 
 /** Taps this close to a point count as hitting it, so each point is at least a 24 px target. */
 const tapSlopPx = 14;
@@ -43,10 +66,16 @@ export default function MapView({
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  // Never saved: the Trail is off each time a map opens.
+  const [trailOn, setTrailOn] = useState(false);
+  // How much of the Trail is drawn, so a style change mid-draw brings it back as it was.
+  const trailDrawn = useRef(1);
+  // With nothing to join the button goes, so the Trail turns off and draws in afresh next time.
+  if (trailOn && !points.trail) setTrailOn(false);
 
   // Event handlers read the latest props through this, so the map is made only once.
-  const latest = useRef({ points, selectedId, onSelect });
-  latest.current = { points, selectedId, onSelect };
+  const latest = useRef({ points, selectedId, onSelect, trailOn });
+  latest.current = { points, selectedId, onSelect, trailOn };
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: the map is made once; its gestures are fixed for its life.
   useEffect(() => {
@@ -60,9 +89,11 @@ export default function MapView({
     const { map } = made;
     mapRef.current = map;
     // Runs on the first load and after every style change, which removes added layers.
-    map.on('style.load', () =>
-      addEntryLayers(map, latest.current.points, latest.current.selectedId),
-    );
+    // A Trail that is on comes back whole, without drawing in again.
+    map.on('style.load', () => {
+      const { points, selectedId, trailOn } = latest.current;
+      addEntryLayers(map, points, selectedId, trailOn ? points.trail : null, trailDrawn.current);
+    });
 
     map.on('click', (event) => {
       const { x, y } = event.point;
@@ -95,8 +126,55 @@ export default function MapView({
   }, []);
 
   useEffect(() => {
-    mapRef.current?.getSource<GeoJSONSource>(sourceId)?.setData(points.collection);
+    const map = mapRef.current;
+    map?.getSource<GeoJSONSource>(sourceId)?.setData(points.collection);
+    // New entries change the Trail in place, without drawing it in again.
+    if (latest.current.trailOn) setTrailData(map, points.trail);
   }, [points]);
+
+  // Turning the Trail on draws it from the first pin to the last once, then no more frames run.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (!trailOn) {
+      setTrailData(map, null);
+      return;
+    }
+    setTrailData(map, latest.current.points.trail);
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      trailDrawn.current = 1;
+      setTrailDrawn(map, trailPaint(), 1);
+      return;
+    }
+    // Colours are read once per draw, and again when a theme switch changes them.
+    let paint = trailPaint();
+    let frame = 0;
+    let started = false;
+    const step = (start: number, now: number) => {
+      const drawn = Math.min((now - start) / trailDrawMs, 1);
+      trailDrawn.current = drawn;
+      setTrailDrawn(map, paint, drawn);
+      if (drawn < 1) frame = requestAnimationFrame((next) => step(start, next));
+    };
+    const begin = () => {
+      started = true;
+      frame = requestAnimationFrame((now) => step(now, now));
+    };
+    // Runs after the map's own handler has added the layers back.
+    const onStyleLoad = () => {
+      paint = trailPaint();
+      if (!started) begin();
+    };
+    trailDrawn.current = 0;
+    setTrailDrawn(map, paint, 0);
+    // Before the style first loads there is no line yet, so the draw-in waits for it.
+    if (map.getLayer(layers.trail)) begin();
+    map.on('style.load', onStyleLoad);
+    return () => {
+      cancelAnimationFrame(frame);
+      map.off('style.load', onStyleLoad);
+    };
+  }, [trailOn]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -127,6 +205,20 @@ export default function MapView({
       <div className="absolute inset-0">
         <div ref={container} className="size-full" />
       </div>
+      {points.trail && (
+        // Below the zoom buttons, clear of the credit at the top left and the card at the bottom.
+        <button
+          type="button"
+          aria-pressed={trailOn}
+          onClick={() => setTrailOn((on) => !on)}
+          className={`absolute top-20 right-2.5 flex min-h-11 items-center gap-1.5 rounded-full px-4 font-medium text-sm shadow-sm ring-1 ring-line ${
+            trailOn ? 'bg-accent text-on-accent' : 'bg-raised text-ink'
+          }`}
+        >
+          <TrailIcon className="size-5" />
+          Trail
+        </button>
+      )}
       {problem && (
         <p
           role="alert"
@@ -150,12 +242,64 @@ function selectedFilter(id: EntryId | null) {
   return ['==', ['get', 'id'], id ?? ''] as ['==', ['get', string], string];
 }
 
-function addEntryLayers(map: MapLibreMap, points: Points, selectedId: EntryId | null) {
+const noTrail: FeatureCollection = { type: 'FeatureCollection', features: [] };
+
+function setTrailData(map: MapLibreMap | null, trail: Trail | null) {
+  map?.getSource<GeoJSONSource>(trailSourceId)?.setData(trail ?? noTrail);
+}
+
+type TrailPaint = readonly {
+  readonly id: string;
+  readonly colour: string;
+  readonly width: number;
+}[];
+
+/** The Trail's layers with their colours, read from the stylesheet as the theme is now. */
+function trailPaint(): TrailPaint {
+  return trailLayers.map(({ id, token: name, width }) => ({ id, colour: token(name), width }));
+}
+
+/**
+ * Shows the Trail from its start to this share of its length, by changing only its colour along
+ * the line, so the data isn't sent again each frame.
+ */
+function setTrailDrawn(map: MapLibreMap, paint: TrailPaint, drawn: number) {
+  for (const { id, colour } of paint) {
+    if (map.getLayer(id)) map.setPaintProperty(id, 'line-gradient', trailGradient(colour, drawn));
+  }
+}
+
+function trailGradient(colour: string, drawn: number): ExpressionSpecification {
+  if (drawn >= 1) return ['interpolate', ['linear'], ['line-progress'], 0, colour, 1, colour];
+  // Step stops must be above zero, so the very start shows from the first frame.
+  return ['step', ['line-progress'], colour, Math.max(drawn, 1e-6), 'rgba(0, 0, 0, 0)'];
+}
+
+function addEntryLayers(
+  map: MapLibreMap,
+  points: Points,
+  selectedId: EntryId | null,
+  trail: Trail | null,
+  trailDrawn: number,
+) {
   if (map.getSource(sourceId)) return;
   const accent = token('accent');
   const onAccent = token('on-accent');
   const ink = token('ink');
   const raised = token('raised');
+
+  // The Trail joins every entry where it really is, so it has its own unclustered source. Its
+  // layers go first, under the clusters and pins, so the pins stay easy to tap.
+  map.addSource(trailSourceId, { type: 'geojson', data: trail ?? noTrail, lineMetrics: true });
+  for (const { id, colour, width } of trailPaint()) {
+    map.addLayer({
+      id,
+      type: 'line',
+      source: trailSourceId,
+      layout: { 'line-cap': 'round', 'line-join': 'round' },
+      paint: { 'line-width': width, 'line-gradient': trailGradient(colour, trailDrawn) },
+    });
+  }
 
   map.addSource(sourceId, {
     type: 'geojson',

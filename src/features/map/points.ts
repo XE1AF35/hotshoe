@@ -1,5 +1,6 @@
 import type { FeatureCollection, Point } from 'geojson';
 import type { Entry, EntryId, TripId } from '../../db/schema.ts';
+import { type Trail, trailLine } from './trail.ts';
 
 /** Every entry, or one trip's. */
 export type TripFilter = 'all' | TripId;
@@ -13,6 +14,8 @@ export interface Points {
   readonly collection: FeatureCollection<Point, PointProperties>;
   /** West, south, east, north, or null when there is nothing to show. */
   readonly bounds: readonly [number, number, number, number] | null;
+  /** The shown entries joined in time order, or null with fewer than two. */
+  readonly trail: Trail | null;
 }
 
 export function entryPoints(entries: readonly Entry[], filter: TripFilter): Points {
@@ -39,5 +42,6 @@ export function entryPoints(entries: readonly Entry[], filter: TripFilter): Poin
       })),
     },
     bounds,
+    trail: trailLine(shown),
   };
 }

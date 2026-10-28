@@ -52,4 +52,13 @@ describe('entryPoints', () => {
   it('has no area when there is nothing to show', () => {
     expect(entryPoints([], 'all').bounds).toBeNull();
   });
+
+  it('joins only the entries it shows into a trail', () => {
+    expect(entryPoints(entries, waiheke).trail?.geometry.coordinates).toEqual([
+      [175.0, -36.8],
+      [175.1, -36.9],
+    ]);
+    expect(entryPoints(entries, 'all').trail?.geometry.coordinates).toHaveLength(3);
+    expect(entryPoints(entries.slice(2), 'all').trail).toBeNull();
+  });
 });
