@@ -10,11 +10,10 @@ import { firstThumb } from '../../db/photos.ts';
 import { useSettings } from '../../db/SettingsProvider.tsx';
 import type { Entry, EntryId, Trip, TripId } from '../../db/schema.ts';
 import { coordStyleOf } from '../../db/settings.ts';
-import { formatDay, formatLoggedClock } from '../../lib/format.ts';
+import { formatCount, formatDay, formatLoggedClock } from '../../lib/format.ts';
 import { useObjectUrl } from '../../lib/useObjectUrl.ts';
-import { AccuracyPill } from '../capture/AccuracyPill.tsx';
 import { EntrySheet } from './EntrySheet.tsx';
-import { groupByDayAndTrip } from './grouping.ts';
+import { type DayGroup, groupByDayAndTrip } from './grouping.ts';
 import { SelectionBar } from './SelectionBar.tsx';
 
 export function EntriesScreen() {
@@ -70,8 +69,10 @@ export function EntriesScreen() {
 
       {days.map((day) => (
         <section key={day.day} aria-labelledby={`day-${day.day}`} className="space-y-3">
-          <h2 id={`day-${day.day}`} className="font-semibold text-lg">
-            {formatDay(day.day)}
+          {/* The count wraps under the date at large text sizes. The date alone names the section. */}
+          <h2 className="flex flex-wrap items-baseline gap-x-2 font-semibold text-lg">
+            <span id={`day-${day.day}`}>{formatDay(day.day)}</span>
+            <span className="font-normal text-muted text-sm">{entryCountLabel(day)}</span>
           </h2>
           {day.trips.map((group) => (
             <div key={group.trip?.id ?? 'none'} className="space-y-1.5">
@@ -83,7 +84,6 @@ export function EntriesScreen() {
                   <li key={entry.id}>
                     <EntryRow
                       entry={entry}
-                      accuracyTargetM={settings.accuracyTargetM}
                       photos={photoCounts?.get(entry.id) ?? 0}
                       onOpen={() => setOpenId(entry.id)}
                       selection={
@@ -134,15 +134,18 @@ export function EntriesScreen() {
   );
 }
 
+function entryCountLabel(day: DayGroup): string {
+  const count = day.trips.reduce((sum, group) => sum + group.entries.length, 0);
+  return formatCount(count, 'entry', 'entries');
+}
+
 function EntryRow({
   entry,
-  accuracyTargetM,
   photos,
   onOpen,
   selection,
 }: {
   readonly entry: Entry;
-  readonly accuracyTargetM: number;
   readonly photos: number;
   readonly onOpen: () => void;
   /** In select mode the row ticks a checkbox instead of opening the entry. */
@@ -160,26 +163,18 @@ function EntryRow({
           onChange={selection.onToggle}
           className="size-5 shrink-0 accent-accent-ink"
         />
-        <EntryRowContent entry={entry} accuracyTargetM={accuracyTargetM} photos={photos} />
+        <EntryRowContent entry={entry} photos={photos} />
       </label>
     );
   }
   return (
     <button type="button" onClick={onOpen} className={className}>
-      <EntryRowContent entry={entry} accuracyTargetM={accuracyTargetM} photos={photos} />
+      <EntryRowContent entry={entry} photos={photos} />
     </button>
   );
 }
 
-function EntryRowContent({
-  entry,
-  accuracyTargetM,
-  photos,
-}: {
-  readonly entry: Entry;
-  readonly accuracyTargetM: number;
-  readonly photos: number;
-}) {
+function EntryRowContent({ entry, photos }: { readonly entry: Entry; readonly photos: number }) {
   return (
     <>
       <span className="min-w-18 shrink-0 font-mono text-sm tabular-nums">
@@ -189,10 +184,9 @@ function EntryRowContent({
         <span className={`block truncate font-medium ${entry.label === null ? 'text-muted' : ''}`}>
           {entry.label ?? 'Untitled'}
         </span>
-        <span className="flex flex-wrap items-center gap-2 text-muted text-sm">
-          <AccuracyPill entry={entry} targetM={accuracyTargetM} />
-          {entry.frame !== null && <span>Frame {entry.frame}</span>}
-        </span>
+        {entry.frame !== null && (
+          <span className="block text-muted text-sm">Frame {entry.frame}</span>
+        )}
       </span>
       {photos > 0 && <RowThumbnail entryId={entry.id} photos={photos} />}
     </>

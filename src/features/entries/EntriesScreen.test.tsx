@@ -54,22 +54,61 @@ describe('EntriesScreen', () => {
     expect(within(earlier).getByText('Wharf')).toBeDefined();
   });
 
-  it('shows unknown accuracy without a number', async () => {
+  it("counts every trip's entries under each day, named by its date alone", async () => {
+    const db = createTestDb();
+    const trip = await addTrip(db, 'Coromandel');
+    // 14 October 2026 in Auckland: one entry in a trip and one without.
+    await addEntry(
+      db,
+      newEntryInput({ loggedAt: Date.parse('2026-10-14T01:00:00Z'), tripId: trip.id }),
+    );
+    await addEntry(db, newEntryInput({ loggedAt: Date.parse('2026-10-14T02:00:00Z') }));
+    // 15 October locally.
+    await addEntry(db, newEntryInput({ loggedAt: Date.parse('2026-10-14T12:00:00Z') }));
+    renderEntries(db);
+
+    const later = await screen.findByRole('region', { name: 'Thursday, 15 October 2026' });
+    expect(within(later).getByRole('heading', { level: 2 }).textContent).toContain('1 entry');
+    const earlier = screen.getByRole('region', { name: 'Wednesday, 14 October 2026' });
+    expect(within(earlier).getByRole('heading', { level: 2 }).textContent).toContain('2 entries');
+  });
+
+  it('keeps accuracy out of the rows', async () => {
+    const db = createTestDb();
+    await addEntry(db, newEntryInput({ label: 'Wharf', accuracyM: 8, frame: '12' }));
+    await addEntry(db, newEntryInput({ label: 'Cafe', origin: 'photo', accuracyM: null }));
+    await addEntry(db, newEntryInput({ label: 'Beach', origin: 'placed', accuracyM: null }));
+    renderEntries(db);
+
+    const row = async (label: string) => screen.findByRole('button', { name: new RegExp(label) });
+    const wharf = await row('Wharf');
+    expect(within(wharf).queryByText('±8 m')).toBeNull();
+    expect(within(wharf).getByText('Frame 12')).toBeDefined();
+    expect(within(await row('Cafe')).queryByText('Accuracy unknown')).toBeNull();
+    expect(within(await row('Beach')).queryByText('Placed by hand')).toBeNull();
+  });
+
+  it('shows accuracy, unknown accuracy, and placing by hand in the sheet', async () => {
     const db = createTestDb();
     await addEntry(db, newEntryInput({ label: 'Wharf', accuracyM: 8 }));
     await addEntry(db, newEntryInput({ label: 'Cafe', origin: 'photo', accuracyM: null }));
     await addEntry(db, newEntryInput({ label: 'Beach', origin: 'placed', accuracyM: null }));
     renderEntries(db);
 
-    const row = async (label: string) => screen.findByRole('button', { name: new RegExp(label) });
-    expect(within(await row('Wharf')).getByText('±8 m')).toBeDefined();
-    expect(within(await row('Cafe')).getByText('Accuracy unknown')).toBeDefined();
-    expect(within(await row('Beach')).getByText('Placed by hand')).toBeDefined();
+    fireEvent.click(await screen.findByRole('button', { name: /Wharf/ }));
+    let sheet = await screen.findByRole('dialog', { name: 'Entry' });
+    expect(within(sheet).getByText(/±8 m/)).toBeDefined();
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Close' }));
 
-    fireEvent.click(await row('Cafe'));
-    const sheet = await screen.findByRole('dialog', { name: 'Entry' });
+    fireEvent.click(await screen.findByRole('button', { name: /Cafe/ }));
+    sheet = await screen.findByRole('dialog', { name: 'Entry' });
     expect(within(sheet).getByText(/Accuracy unknown/)).toBeDefined();
     expect(within(sheet).queryByText(/±/)).toBeNull();
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Close' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: /Beach/ }));
+    sheet = await screen.findByRole('dialog', { name: 'Entry' });
+    expect(within(sheet).getByText(/Placed by hand/)).toBeDefined();
   });
 
   it('edits an entry in the sheet', async () => {
