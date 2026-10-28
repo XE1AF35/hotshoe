@@ -1,10 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { addEntry, deleteEntry, updateEntry } from '../../db/entries.ts';
-import { addPhoto, deletePhoto, type NewPhoto } from '../../db/photos.ts';
-import type { EntryId } from '../../db/schema.ts';
+import { addPhoto, deletePhoto } from '../../db/photos.ts';
 import { setSetting } from '../../db/settings.ts';
 import { addTrip, renameTrip, setCameraClock } from '../../db/trips.ts';
-import { createTestDb, jpegBlob, newEntryInput } from '../../test/db.ts';
+import { createTestDb, newEntryInput, newPhotoInput } from '../../test/db.ts';
 import { createBackup } from './backup.ts';
 import {
   type BackupStatus,
@@ -17,18 +16,6 @@ import {
 const base = Date.parse('2026-10-14T03:00:00Z');
 /** A moment some minutes into the test's day. */
 const at = (minutes: number) => base + minutes * 60_000;
-
-function photoInput(entryId: EntryId): NewPhoto {
-  return {
-    entryId,
-    takenAt: base,
-    source: 'camera',
-    image: jpegBlob(400),
-    thumb: jpegBlob(40),
-    width: 1600,
-    height: 1200,
-  };
-}
 
 describe('readBackupStatus', () => {
   it('counts every entry as pending before the first backup', async () => {
@@ -77,7 +64,7 @@ describe('readBackupStatus', () => {
     const db = createTestDb();
     const kept = await addEntry(db, newEntryInput(), at(1));
     const removed = await addEntry(db, newEntryInput(), at(1));
-    const photo = await addPhoto(db, photoInput(kept.id), at(2));
+    const photo = await addPhoto(db, newPhotoInput(kept.id, { takenAt: base }), at(2));
     await recordBackup(db, await createBackup(db, { includePhotos: true, now: at(5) }));
 
     await deletePhoto(db, photo.id);
@@ -106,7 +93,7 @@ describe('recordBackup', () => {
   it('leaves new photos pending after a backup made without them', async () => {
     const db = createTestDb();
     const entry = await addEntry(db, newEntryInput(), at(1));
-    await addPhoto(db, photoInput(entry.id), at(2));
+    await addPhoto(db, newPhotoInput(entry.id, { takenAt: base }), at(2));
     expect((await readBackupStatus(db)).pending).toEqual({ entries: 1, photos: 1, trips: false });
 
     await recordBackup(db, await createBackup(db, { includePhotos: false, now: at(5) }));
@@ -166,7 +153,7 @@ describe('backupDue', () => {
     const db = createTestDb();
     const entry = await addEntry(db, newEntryInput(), at(0));
     await recordBackup(db, await createBackup(db, { includePhotos: true, now: at(0) + day }));
-    await addPhoto(db, photoInput(entry.id), at(0) + 2 * day);
+    await addPhoto(db, newPhotoInput(entry.id, { takenAt: base }), at(0) + 2 * day);
     // Backups without photos since then don't make the photo any safer.
     await recordBackup(db, await createBackup(db, { includePhotos: false, now: at(0) + 7 * day }));
 

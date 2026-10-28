@@ -47,6 +47,19 @@ export async function firstThumb(db: HotshoeDb, entryId: EntryId): Promise<Blob 
   return first ? new Blob([first.thumb], { type: 'image/jpeg' }) : null;
 }
 
+/**
+ * A check of whether a time falls in the same second as a stored photo's shot time, for spotting
+ * photos added before.
+ */
+export async function storedPhotoSecondCheck(db: HotshoeDb): Promise<(at: number) => boolean> {
+  // Index keys only: reading the photos themselves would load every image.
+  // Dexie types a compound index's keys as single values, though each is a pair.
+  type Key = readonly [EntryId, number];
+  const keys = (await db.photos.orderBy('[entryId+takenAt]').keys()) as unknown as Key[];
+  const seconds = new Set(keys.map(([, takenAt]) => secondOf(takenAt)));
+  return (at) => seconds.has(secondOf(at));
+}
+
 /** Bytes used by all photos, for the storage readout. */
 export async function totalPhotoBytes(db: HotshoeDb): Promise<number> {
   // Index keys only: reading the photos themselves would load every image.
@@ -57,6 +70,10 @@ export async function totalPhotoBytes(db: HotshoeDb): Promise<number> {
 async function toStored(photo: Photo): Promise<StoredPhoto> {
   const [image, thumb] = await Promise.all([photo.image.arrayBuffer(), photo.thumb.arrayBuffer()]);
   return { ...photo, image, thumb };
+}
+
+function secondOf(epochMs: number): number {
+  return Math.floor(epochMs / 1000);
 }
 
 function fromStored(stored: StoredPhoto): Photo {

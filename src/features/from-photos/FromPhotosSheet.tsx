@@ -2,6 +2,7 @@ import { useEffect, useId, useState } from 'react';
 import { Sheet } from '../../app/Sheet.tsx';
 import { useDb } from '../../db/DbProvider.tsx';
 import { useActiveTrip, useLatestEntry, useTrips } from '../../db/hooks.ts';
+import { storedPhotoSecondCheck } from '../../db/photos.ts';
 import { useSettings } from '../../db/SettingsProvider.tsx';
 import type { TripId } from '../../db/schema.ts';
 import { coordStyleOf } from '../../db/settings.ts';
@@ -27,6 +28,8 @@ interface Row {
   readonly key: number;
   readonly draft: PhotoDraft;
   readonly ticked: boolean;
+  /** Its shot time matches, to the second, a Photo already stored. */
+  readonly alreadyAdded: boolean;
   /** The date and time field's value, for a photo whose time couldn't be found. */
   readonly typed: string;
   /** The coordinates field's value, for a photo whose location couldn't be found. */
@@ -63,23 +66,29 @@ export function FromPhotosSheet({
 
   useEffect(() => {
     let current = true;
-    void Promise.all(files.map((file) => readPhotoDraft(file, deviceZone))).then((drafts) => {
-      if (current)
-        setPicked(
-          drafts.map((draft, key) => ({
+    const reading = Promise.all(files.map((file) => readPhotoDraft(file, deviceZone)));
+    void Promise.all([reading, storedPhotoSecondCheck(db)]).then(([drafts, isStoredSecond]) => {
+      if (!current) return;
+      setPicked(
+        drafts.map((draft, key) => {
+          // Checked against stored Photos only, so two shots in the same second aren't repeats.
+          const alreadyAdded = draft.time.source !== 'missing' && isStoredSecond(draft.time.at);
+          return {
             key,
             draft,
-            ticked: true,
+            ticked: !alreadyAdded,
+            alreadyAdded,
             typed: '',
             coordsText: '',
             copied: null,
-          })),
-        );
+          };
+        }),
+      );
     });
     return () => {
       current = false;
     };
-  }, [files, deviceZone]);
+  }, [db, files, deviceZone]);
 
   const rows =
     picked && inShotOrder(picked.map((row) => withPlacement(withTypedTime(row, deviceZone))));
@@ -258,6 +267,7 @@ function DraftRow({
         </span>
         <span className="flex min-w-0 flex-col gap-0.5 text-sm">
           <span className="break-all font-medium">{file.name}</span>
+          {row.alreadyAdded && <Flag>Already added</Flag>}
           {time.source === 'missing' ? (
             <Flag>No time</Flag>
           ) : (

@@ -9,7 +9,7 @@ import type { Entry } from '../../db/schema.ts';
 import { getSettings, setSetting } from '../../db/settings.ts';
 import { addTrip, setActiveTrip } from '../../db/trips.ts';
 import { offsetOnlyZone } from '../../lib/time.ts';
-import { createTestDb, newEntryInput } from '../../test/db.ts';
+import { createTestDb, newEntryInput, newPhotoInput } from '../../test/db.ts';
 import { type ExifFields, jpegWithExif } from '../../test/exif.ts';
 import { renderWithDb } from '../../test/render.tsx';
 import { LogScreen } from '../capture/LogScreen.tsx';
@@ -513,6 +513,58 @@ describe('From photos', () => {
 
     await screen.findByText('Added 1 entry.');
     expect((await listEntries(db))[0]?.tripId).toBeNull();
+  });
+
+  it('marks a photo already added through From photos and starts it unticked', async () => {
+    const db = createTestDb();
+    const first = await pick(db, [photoFile('IMG_0001.JPG', harbour)]);
+    fireEvent.click(await within(first).findByRole('button', { name: 'Add 1 entry' }));
+    await screen.findByText('Added 1 entry.');
+
+    const sheet = await pick(db, [
+      photoFile('IMG_0001.JPG', harbour),
+      photoFile('IMG_0002.JPG', hanoi),
+    ]);
+
+    const again = await within(sheet).findByRole('checkbox', { name: /IMG_0001.*Already added/ });
+    expect(again).toHaveProperty('checked', false);
+    expect(within(sheet).getByRole('checkbox', { name: /IMG_0002/ })).toHaveProperty(
+      'checked',
+      true,
+    );
+    expect(within(sheet).queryByRole('checkbox', { name: /IMG_0002.*Already added/ })).toBeNull();
+
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Add 1 entry' }));
+    await screen.findByText('Added 1 entry.');
+    expect(await listEntries(db)).toHaveLength(2);
+  });
+
+  it('marks a photo taken in the same second as one from Log with photo, and adds it if ticked', async () => {
+    const db = createTestDb();
+    const logged = await addEntry(db, newEntryInput());
+    // The camera's file date, a fraction of a second after the shot time in the metadata.
+    await photosRepo.addPhoto(
+      db,
+      newPhotoInput(logged.id, { takenAt: Date.parse('2026-10-13T21:35:12.640Z') }),
+    );
+
+    const sheet = await pick(db, [
+      photoFile('IMG_0001.JPG', harbour),
+      // Shot a second later, and twice in that second, as a burst does.
+      photoFile('IMG_0002.JPG', { ...harbour, dateTimeOriginal: '2026:10:14 10:35:13' }),
+      photoFile('IMG_0003.JPG', { ...harbour, dateTimeOriginal: '2026:10:14 10:35:13' }),
+    ]);
+
+    const again = await within(sheet).findByRole('checkbox', { name: /IMG_0001.*Already added/ });
+    expect(again).toHaveProperty('checked', false);
+    expect(within(sheet).queryAllByText('Already added')).toHaveLength(1);
+    expect(within(sheet).getByRole('button', { name: 'Add 2 entries' })).toBeDefined();
+
+    fireEvent.click(again);
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Add 3 entries' }));
+
+    await screen.findByText('Added 3 entries.');
+    expect(await listEntries(db)).toHaveLength(4);
   });
 
   it('saves nothing on Cancel', async () => {

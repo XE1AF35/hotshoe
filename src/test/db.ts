@@ -1,6 +1,8 @@
 import { afterEach } from 'vitest';
 import { HotshoeDb } from '../db/database.ts';
 import type { NewEntry } from '../db/entries.ts';
+import type { NewPhoto } from '../db/photos.ts';
+import type { EntryId } from '../db/schema.ts';
 
 const openDbs: HotshoeDb[] = [];
 
@@ -26,6 +28,19 @@ export function newEntryInput(overrides: Partial<NewEntry> = {}): NewEntry {
     accuracyM: 8,
     altitudeM: 12.5,
     altitudeAccuracyM: 4,
+    ...overrides,
+  };
+}
+
+export function newPhotoInput(entryId: EntryId, overrides: Partial<NewPhoto> = {}): NewPhoto {
+  return {
+    entryId,
+    takenAt: 1000,
+    source: 'camera',
+    image: jpegBlob(400),
+    thumb: jpegBlob(40),
+    width: 1600,
+    height: 1200,
     ...overrides,
   };
 }

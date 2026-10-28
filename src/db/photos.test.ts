@@ -1,28 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { createTestDb, jpegBlob, newEntryInput } from '../test/db.ts';
+import { createTestDb, jpegBlob, newEntryInput, newPhotoInput } from '../test/db.ts';
 import { addEntry } from './entries.ts';
 import { MissingRecordError } from './errors.ts';
-import { addPhoto, deletePhoto, listPhotos, type NewPhoto, totalPhotoBytes } from './photos.ts';
+import { addPhoto, deletePhoto, listPhotos, totalPhotoBytes } from './photos.ts';
 import type { EntryId } from './schema.ts';
-
-function photoInput(entryId: EntryId, overrides: Partial<NewPhoto> = {}): NewPhoto {
-  return {
-    entryId,
-    takenAt: 1000,
-    source: 'camera',
-    image: jpegBlob(400),
-    thumb: jpegBlob(40),
-    width: 1600,
-    height: 1200,
-    ...overrides,
-  };
-}
 
 describe('photos', () => {
   it('stores the JPEGs as bytes and reads them back as intact blobs', async () => {
     const db = createTestDb();
     const entry = await addEntry(db, newEntryInput());
-    const photo = await addPhoto(db, photoInput(entry.id));
+    const photo = await addPhoto(db, newPhotoInput(entry.id));
 
     const [stored] = await listPhotos(db, entry.id);
     expect(stored?.bytes).toBe(440);
@@ -42,16 +29,16 @@ describe('photos', () => {
     const db = createTestDb();
     const entry = await addEntry(db, newEntryInput());
     const other = await addEntry(db, newEntryInput());
-    await addPhoto(db, photoInput(entry.id, { takenAt: 3000 }));
-    await addPhoto(db, photoInput(other.id, { takenAt: 2000 }));
-    await addPhoto(db, photoInput(entry.id, { takenAt: 1000 }));
+    await addPhoto(db, newPhotoInput(entry.id, { takenAt: 3000 }));
+    await addPhoto(db, newPhotoInput(other.id, { takenAt: 2000 }));
+    await addPhoto(db, newPhotoInput(entry.id, { takenAt: 1000 }));
 
     expect((await listPhotos(db, entry.id)).map((photo) => photo.takenAt)).toEqual([1000, 3000]);
   });
 
   it('refuses a photo for a missing entry', async () => {
     const db = createTestDb();
-    await expect(addPhoto(db, photoInput('missing' as EntryId))).rejects.toBeInstanceOf(
+    await expect(addPhoto(db, newPhotoInput('missing' as EntryId))).rejects.toBeInstanceOf(
       MissingRecordError,
     );
   });
@@ -59,8 +46,8 @@ describe('photos', () => {
   it('totals photo storage and updates after a delete', async () => {
     const db = createTestDb();
     const entry = await addEntry(db, newEntryInput());
-    const first = await addPhoto(db, photoInput(entry.id));
-    await addPhoto(db, photoInput(entry.id, { image: jpegBlob(1000) }));
+    const first = await addPhoto(db, newPhotoInput(entry.id));
+    await addPhoto(db, newPhotoInput(entry.id, { image: jpegBlob(1000) }));
     expect(await totalPhotoBytes(db)).toBe(440 + 1040);
 
     await deletePhoto(db, first.id);
