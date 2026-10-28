@@ -2,13 +2,13 @@
 
 Log where you took a photo, so you can geotag it later.
 
-Hotshoe is a small web app for iPhone, installed to the Home Screen from Safari. Tap one button when you take a photo and it records your location, accuracy, and time. You can attach a quick reference photo from the iPhone camera, then copy the coordinates into any photo site or map app, or export a GPX track for digiKam, Lightroom, or darktable.
+Hotshoe is a small web app for iPhone, installed to the Home Screen from Safari. Tap one button when you take a photo and it records your location, accuracy, and time. You can attach a quick reference photo from the iPhone camera, or add entries afterwards from photos in your library, then copy the coordinates into any photo site or map app, or export a GPX track for digiKam, Lightroom, or darktable.
 
 Your entries stay on your phone. There is no account, no server, and no tracking.
 
 **Open it:** https://xe1af35.github.io/hotshoe/
 
-<img src="docs/screenshots/phone-app.png" width="840" alt="Hotshoe on an iPhone: a location just logged with its accuracy and a label, the entries grouped by day and trip with photo thumbnails, and a map of every entry">
+<img src="docs/screenshots/phone-app.png" width="840" alt="Hotshoe on an iPhone: the last location logged with its accuracy, label, and photo; a day of entries with its map open and the trail joining them; and photos from the library being reviewed before they become entries">
 
 ## Install on iPhone
 
@@ -23,10 +23,11 @@ Hotshoe works offline after the first visit, and updates itself the next time yo
 
 - **Log:** tap **Log location** as you take a photo. Hotshoe waits until the fix is within your accuracy target (20 m unless you change it), then saves. **Use this fix** saves the best fix so far, marked as a weak fix if it missed the target. **Log with photo** also opens the camera for a reference shot.
 - **Label and frame:** type them on the card after logging. Nothing blocks the next log.
+- **From photos:** add entries from photos already in your library, using each photo's own time and location. You review them first: photos already in Hotshoe start unticked, and a photo with no location can be placed by pasting coordinates, copying the previous photo's place, or dropping a pin on a map. A photo with no time zone or shot time gets one worked out, marked so you can check it.
 - **Copy coordinates:** pastes as `-36.848461, 174.763336`, or as degrees, minutes, and seconds if you choose that in Settings. Choose a decimal comma in Settings for apps that want `-36,848461`, and tap either line of an entry's coordinates to copy just that number.
 - **Trips:** pick an active trip on the Log screen and new entries join it. Open a trip on the More tab for its summary: entries and photos, the dates and days it covers, the rough distance in straight lines between entries, and how many weak fixes it has.
-- **Entries:** grouped by day and trip. Tap one to edit it, add photos, or show it on the map. **Select** lets you tick entries and export just those.
-- **Map:** asks before loading, because the map comes from an online service (see Privacy).
+- **Entries:** grouped by day and trip, with a count for each day. Tap one to edit its label, frame, date and time, add photos, or show it on the map. Tap a day's heading for a map of just that day. **Select** lets you tick entries and export just those.
+- **Map:** asks before loading, because the map comes from an online service (see Privacy). **Trail** draws a line through the entries on the map in the order you logged them, so you can see the route you took.
 - **Light or dark:** Hotshoe follows your iPhone's setting. To keep it light or dark whatever the iPhone does, choose **Appearance** in Settings on the More tab.
 
 ## Geotagging your photos
@@ -59,7 +60,7 @@ Hotshoe keeps everything on this iPhone only. Deleting the app deletes your entr
 - Your entries and photos never leave the phone unless you export, share, or back them up yourself.
 - **The map is the one exception.** To draw it, Hotshoe asks [OpenFreeMap](https://openfreemap.org/) for the area on screen, so OpenFreeMap sees that area and your internet address, but not your entries. Hotshoe asks before loading the map, unless you turn on loading it without asking.
 - The app itself is served by GitHub Pages, which sees your internet address when the app is installed or updated.
-- Photos are re-encoded on the phone, so camera metadata such as the photo's own location isn't kept.
+- Photos are re-encoded on the phone, so camera metadata such as the photo's own location isn't kept with them. **From photos** reads a photo's time and location on the phone to make its entry, and nothing else.
 - There are no analytics, cookies, or accounts.
 
 Map data © [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors.
