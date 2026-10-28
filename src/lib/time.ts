@@ -17,6 +17,46 @@ export function captureTimeContext(at: Date): TimeContext {
   };
 }
 
+/**
+ * The zone of a time known only by its UTC offset, such as a photo shot in another zone. It is no
+ * zone Intl knows, so display and day grouping fall back to the offset. Offset strings such as
+ * `+07:00` would not do, as Intl accepts them as zones.
+ */
+export const offsetOnlyZone = 'offset-only';
+
+/**
+ * The context for a time recorded with an offset: `timeZone` itself when its offset at that
+ * instant is the same, otherwise offset only.
+ */
+export function contextForOffset(
+  epochMs: number,
+  utcOffsetMin: number,
+  timeZone: string,
+): TimeContext {
+  return {
+    timeZone: zoneOffsetMin(epochMs, timeZone) === utcOffsetMin ? timeZone : offsetOnlyZone,
+    utcOffsetMin,
+  };
+}
+
+/** Minutes ahead of UTC in a zone at an instant, or null for a zone Intl doesn't know. */
+export function zoneOffsetMin(epochMs: number, timeZone: string): number | null {
+  let name: string | undefined;
+  try {
+    name = new Intl.DateTimeFormat('en-US', { timeZone, timeZoneName: 'longOffset' })
+      .formatToParts(epochMs)
+      .find((part) => part.type === 'timeZoneName')?.value;
+  } catch {
+    return null;
+  }
+  // `GMT+05:30`, or plain `GMT` at UTC.
+  const match = name?.match(/^GMT(?:([+-])(\d{2}):(\d{2}))?$/);
+  if (!match) return null;
+  if (!match[1]) return 0;
+  const minutes = Number(match[2]) * 60 + Number(match[3]);
+  return match[1] === '-' ? -minutes : minutes;
+}
+
 const dayFormatters = new Map<string, Intl.DateTimeFormat>();
 
 function dayFormatter(timeZone: string): Intl.DateTimeFormat | null {

@@ -1,5 +1,6 @@
-import type { ReactNode } from 'react';
-import { CameraIcon, CheckIcon, CloseIcon, PinIcon } from '../../app/icons.tsx';
+import { lazy, type ReactNode, Suspense, useState } from 'react';
+import { CameraIcon, CheckIcon, CloseIcon, PhotosIcon, PinIcon } from '../../app/icons.tsx';
+import { tabHref } from '../../app/router.ts';
 import { ScreenHeader } from '../../app/ScreenHeader.tsx';
 import { useLatestEntry } from '../../db/hooks.ts';
 import { useSettings } from '../../db/SettingsProvider.tsx';
@@ -13,6 +14,11 @@ import { CaptureProblem } from './CaptureProblem.tsx';
 import { useCapture } from './CaptureProvider.tsx';
 import { type CaptureState, fixProgress, isBusy } from './capture.ts';
 import { EntryCard } from './EntryCard.tsx';
+
+// The metadata reader, review sheet, and saving code load only when From photos is used.
+const loadFromPhotos = () => import('../from-photos/FromPhotosSheet.tsx');
+const loadSaveMessage = () => import('../from-photos/save.ts');
+const FromPhotosSheet = lazy(() => loadFromPhotos().then((m) => ({ default: m.FromPhotosSheet })));
 
 export function LogScreen() {
   const latest = useLatestEntry();
@@ -32,12 +38,35 @@ function LogScreenBody({ latest }: { readonly latest: Entry | null }) {
   const capture = useCapture();
   const { state, photoMessage } = capture;
   const justSaved = state.status === 'saved' && latest?.id === state.entryId;
-  // The camera input stays here, since iOS only opens the camera straight from a tap.
-  const camera = usePhotoInputs(capture.addPhotos);
+  const [picked, setPicked] = useState<readonly File[] | null>(null);
+  const [fromPhotosMessage, setFromPhotosMessage] = useState<{
+    text: string;
+    added: number;
+  } | null>(null);
+  // The inputs stay here, since iOS only opens the camera or library straight from a tap.
+  const photoInputs = usePhotoInputs((files, source) => {
+    if (source === 'camera') {
+      capture.addPhotos(files);
+    } else {
+      setFromPhotosMessage(null);
+      setPicked(files);
+    }
+  });
+
+  function start() {
+    setFromPhotosMessage(null);
+    capture.start();
+  }
 
   function startWithPhoto() {
-    capture.start();
-    camera.openCamera();
+    start();
+    photoInputs.openCamera();
+  }
+
+  function openFromPhotos() {
+    // Start fetching the code while the picker is open.
+    void loadFromPhotos();
+    photoInputs.openLibrary();
   }
 
   return (
@@ -52,6 +81,19 @@ function LogScreenBody({ latest }: { readonly latest: Entry | null }) {
       {photoMessage && (
         <p role="status" className="text-sm">
           {photoMessage}
+        </p>
+      )}
+      {fromPhotosMessage && (
+        <p role="status" className="text-sm">
+          <span>{fromPhotosMessage.text}</span>
+          {fromPhotosMessage.added > 0 && (
+            <>
+              {' '}
+              <a href={tabHref('entries')} className="font-medium text-accent-ink underline">
+                See them in Entries
+              </a>
+            </>
+          )}
         </p>
       )}
 
@@ -74,13 +116,29 @@ function LogScreenBody({ latest }: { readonly latest: Entry | null }) {
         <CaptureControls
           state={state}
           targetM={settings.accuracyTargetM}
-          onStart={capture.start}
+          onStart={start}
           onStartWithPhoto={startWithPhoto}
+          onFromPhotos={openFromPhotos}
           onAccept={capture.accept}
           onCancel={capture.cancel}
         />
       </div>
-      {camera.inputs}
+      {photoInputs.inputs}
+      {picked && (
+        <Suspense fallback={null}>
+          <FromPhotosSheet
+            files={picked}
+            onDone={(result) => {
+              setPicked(null);
+              if (result) {
+                void loadSaveMessage().then(({ saveMessage }) =>
+                  setFromPhotosMessage({ text: saveMessage(result), added: result.added }),
+                );
+              }
+            }}
+          />
+        </Suspense>
+      )}
     </>
   );
 }
@@ -90,6 +148,7 @@ function CaptureControls({
   targetM,
   onStart,
   onStartWithPhoto,
+  onFromPhotos,
   onAccept,
   onCancel,
 }: {
@@ -97,6 +156,7 @@ function CaptureControls({
   readonly targetM: number;
   readonly onStart: () => void;
   readonly onStartWithPhoto: () => void;
+  readonly onFromPhotos: () => void;
   readonly onAccept: () => void;
   readonly onCancel: () => void;
 }) {
@@ -147,7 +207,9 @@ function CaptureControls({
               </span>
               Log location
             </button>
-            <span />
+            <SideButton onClick={onFromPhotos} disabled={isBusy(state)} label="From photos">
+              <PhotosIcon className="size-6" />
+            </SideButton>
           </>
         )}
       </div>

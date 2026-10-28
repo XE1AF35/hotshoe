@@ -69,6 +69,16 @@ export function CameraIcon(props: IconProps) {
   );
 }
 
+/** Photos already taken, in the library. */
+export function PhotosIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="3" y="7" width="14" height="14" rx="2" />
+      <path d="M7 3h12a2 2 0 0 1 2 2v12M3 17l4-4 3 3 2-2 5 5" />
+    </Svg>
+  );
+}
+
 export function ShareIcon(props: IconProps) {
   return (
     <Svg {...props}>

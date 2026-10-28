@@ -14,7 +14,8 @@ export interface AttachResult {
 
 /**
  * Processes and stores photos for an entry, one at a time to keep memory low on the phone.
- * Stops at the first storage-full error, since later photos would fail the same way.
+ * Stops at the first storage-full error, since later photos would fail the same way. `takenAt`
+ * replaces the file date when the shot time is known better, as from the photo's own metadata.
  */
 export async function attachPhotos(
   db: HotshoeDb,
@@ -22,6 +23,7 @@ export async function attachPhotos(
   files: readonly File[],
   quality: PhotoQuality,
   source: Photo['source'],
+  takenAt?: number,
 ): Promise<AttachResult> {
   let added = 0;
   let problem: AttachResult['problem'] = null;
@@ -31,7 +33,12 @@ export async function attachPhotos(
     for (const file of files) {
       try {
         const processed = await processPhoto(file, quality);
-        await addPhoto(db, { ...processed, entryId, source });
+        await addPhoto(db, {
+          ...processed,
+          takenAt: takenAt ?? processed.takenAt,
+          entryId,
+          source,
+        });
         added += 1;
       } catch (error) {
         if (error instanceof StorageFullError) return { added, problem: 'storage-full' };
