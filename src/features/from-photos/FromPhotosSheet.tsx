@@ -5,12 +5,20 @@ import { useActiveTrip, useTrips } from '../../db/hooks.ts';
 import { useSettings } from '../../db/SettingsProvider.tsx';
 import type { TripId } from '../../db/schema.ts';
 import { coordStyleOf } from '../../db/settings.ts';
-import { type CoordStyle, formatCoords } from '../../lib/coords.ts';
+import { type CoordStyle, formatCoords, type LatLon } from '../../lib/coords.ts';
 import { formatCount, formatLoggedTime } from '../../lib/format.ts';
+import { parseCoords } from '../../lib/parseCoords.ts';
 import { useObjectUrl } from '../../lib/useObjectUrl.ts';
 import { describeAccuracy } from '../capture/capture.ts';
 import { TripSelect } from '../trips/TripSelect.tsx';
-import { isComplete, type PhotoDraft, readPhotoDraft, typedTime } from './draft.ts';
+import {
+  type DraftLocation,
+  isComplete,
+  type PhotoDraft,
+  placeDraft,
+  readPhotoDraft,
+  typedTime,
+} from './draft.ts';
 import { type SaveResult, saveDrafts } from './save.ts';
 
 interface Row {
@@ -20,6 +28,10 @@ interface Row {
   readonly ticked: boolean;
   /** The date and time field's value, for a photo whose time couldn't be found. */
   readonly typed: string;
+  /** The coordinates field's value, for a photo whose location couldn't be found. */
+  readonly coordsText: string;
+  /** A location copied from another row, kept exact while the field still shows it. */
+  readonly copied: { readonly text: string; readonly coords: LatLon } | null;
 }
 
 /**
@@ -48,22 +60,37 @@ export function FromPhotosSheet({
   useEffect(() => {
     let current = true;
     void Promise.all(files.map((file) => readPhotoDraft(file, deviceZone))).then((drafts) => {
-      if (current) setPicked(drafts.map((draft, key) => ({ key, draft, ticked: true, typed: '' })));
+      if (current)
+        setPicked(
+          drafts.map((draft, key) => ({
+            key,
+            draft,
+            ticked: true,
+            typed: '',
+            coordsText: '',
+            copied: null,
+          })),
+        );
     });
     return () => {
       current = false;
     };
   }, [files, deviceZone]);
 
-  const rows = picked && inShotOrder(picked.map((row) => withTypedTime(row, deviceZone)));
+  const rows =
+    picked && inShotOrder(picked.map((row) => withPlacement(withTypedTime(row, deviceZone))));
 
+  const coordStyle = coordStyleOf(settings);
   const tripId = chosenTrip === undefined ? (activeTrip?.id ?? null) : chosenTrip;
   const ticked = rows?.filter((row) => row.ticked) ?? [];
   const untimed = ticked.some(({ draft }) => draft.time.source === 'missing');
   const unplaced = ticked.some(({ draft }) => draft.location === null);
   const canConfirm = ticked.length > 0 && ticked.every(({ draft }) => isComplete(draft)) && !saving;
 
-  function change(key: number, update: Partial<Pick<Row, 'ticked' | 'typed'>>) {
+  function change(
+    key: number,
+    update: Partial<Pick<Row, 'ticked' | 'typed' | 'coordsText' | 'copied'>>,
+  ) {
     setPicked(
       (current) => current?.map((row) => (row.key === key ? { ...row, ...update } : row)) ?? null,
     );
@@ -86,17 +113,28 @@ export function FromPhotosSheet({
       ) : (
         <>
           <ul aria-label="Photos" className="space-y-2">
-            {rows.map((row) => (
-              <li key={row.key}>
-                <DraftRow
-                  row={row}
-                  disabled={saving}
-                  coordStyle={coordStyleOf(settings)}
-                  onToggle={() => change(row.key, { ticked: !row.ticked })}
-                  onType={(typed) => change(row.key, { typed })}
-                />
-              </li>
-            ))}
+            {rows.map((row, index) => {
+              const previous = previousLocation(rows, index);
+              return (
+                <li key={row.key}>
+                  <DraftRow
+                    row={row}
+                    disabled={saving}
+                    coordStyle={coordStyle}
+                    onToggle={() => change(row.key, { ticked: !row.ticked })}
+                    onType={(typed) => change(row.key, { typed })}
+                    onCoordsChange={(coordsText) => change(row.key, { coordsText })}
+                    onSameAsPrevious={
+                      previous &&
+                      (() => {
+                        const text = formatCoords(previous, coordStyle);
+                        change(row.key, { coordsText: text, copied: { text, coords: previous } });
+                      })
+                    }
+                  />
+                </li>
+              );
+            })}
           </ul>
 
           <div className="space-y-1">
@@ -113,7 +151,7 @@ export function FromPhotosSheet({
           )}
           {unplaced && (
             <p className="text-accent-ink text-sm">
-              Untick the photos with no location to add the rest.
+              Place each photo with no location, or untick it.
             </p>
           )}
 
@@ -151,17 +189,27 @@ function DraftRow({
   coordStyle,
   onToggle,
   onType,
+  onCoordsChange,
+  onSameAsPrevious,
 }: {
   readonly row: Row;
   readonly disabled: boolean;
   readonly coordStyle: CoordStyle;
   readonly onToggle: () => void;
   readonly onType: (typed: string) => void;
+  readonly onCoordsChange: (coordsText: string) => void;
+  /** Null when no earlier row has a location to copy. */
+  readonly onSameAsPrevious: (() => void) | null;
 }) {
   const thumb = useObjectUrl(row.draft.file);
   const timeFieldId = useId();
+  const coordsFieldId = useId();
+  const coordsErrorId = useId();
   const { file, time, location } = row.draft;
   const needsTime = time.source === 'missing' || time.source === 'typed';
+  const needsPlace = location === null || location.origin === 'placed';
+  const parsed = row.coordsText.trim() === '' ? null : parseCoords(row.coordsText);
+  const coordsProblem = parsed?.ok === false ? parsed.problem : null;
 
   return (
     <div className="rounded-xl p-2 has-checked:bg-surface">
@@ -198,7 +246,7 @@ function DraftRow({
           ) : (
             <span className="text-muted">
               <span className="font-mono tabular-nums">{formatCoords(location, coordStyle)}</span>{' '}
-              {describeAccuracy({ accuracyM: location.accuracyM, origin: 'photo' })}
+              {describeAccuracy(location)}
             </span>
           )}
         </span>
@@ -218,6 +266,43 @@ function DraftRow({
           />
         </div>
       )}
+      {needsPlace && (
+        <div className="mt-2 space-y-1 pl-8">
+          <label htmlFor={coordsFieldId} className="block text-muted text-sm">
+            Coordinates<span className="sr-only"> for {file.name}</span>
+          </label>
+          <input
+            id={coordsFieldId}
+            type="text"
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
+            placeholder="-36.848461, 174.763336"
+            value={row.coordsText}
+            disabled={disabled}
+            aria-invalid={coordsProblem !== null}
+            aria-describedby={coordsProblem === null ? undefined : coordsErrorId}
+            onChange={(event) => onCoordsChange(event.target.value)}
+            className="min-h-12 w-full min-w-0 rounded-xl border border-line bg-raised px-3 font-mono text-base"
+          />
+          {coordsProblem !== null && (
+            <p id={coordsErrorId} className="text-accent-ink text-sm">
+              {coordsProblem}
+            </p>
+          )}
+          {onSameAsPrevious && (
+            <button
+              type="button"
+              onClick={onSameAsPrevious}
+              disabled={disabled}
+              className="min-h-12 w-full rounded-xl border border-line px-3 font-medium disabled:opacity-50"
+            >
+              Same place as the previous photo<span className="sr-only"> for {file.name}</span>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -234,6 +319,25 @@ function Flag({ children }: { readonly children: string }) {
 function withTypedTime(row: Row, deviceZone: string): Row {
   if (row.draft.time.source !== 'missing') return row;
   return { ...row, draft: { ...row.draft, time: typedTime(row.typed, deviceZone) } };
+}
+
+/** A row whose photo had no location, placed at the location copied or pasted for it, if any. */
+function withPlacement(row: Row): Row {
+  if (row.draft.location !== null) return row;
+  if (row.copied?.text === row.coordsText) {
+    return { ...row, draft: placeDraft(row.draft, row.copied.coords) };
+  }
+  const parsed = parseCoords(row.coordsText);
+  return parsed.ok ? { ...row, draft: placeDraft(row.draft, parsed.coords) } : row;
+}
+
+/** The location of the nearest row above this one that has one, or null. */
+function previousLocation(rows: readonly Row[], index: number): DraftLocation | null {
+  for (let i = index - 1; i >= 0; i -= 1) {
+    const location = rows[i]?.draft.location;
+    if (location) return location;
+  }
+  return null;
 }
 
 /** Oldest shot first; photos with no time keep their picked order, after the rest. */

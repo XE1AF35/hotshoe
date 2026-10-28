@@ -24,6 +24,8 @@ export interface DraftLocation extends LatLon {
   readonly altitudeM: number | null;
   /** Epoch ms UTC of the GPS reading, when the photo records it. */
   readonly gpsAt: number | null;
+  /** Read from the photo, or set by hand in the review sheet. */
+  readonly origin: 'photo' | 'placed';
 }
 
 export type DraftTime =
@@ -74,8 +76,16 @@ export function newEntryFromDraft(draft: PhotoDraft, tripId: TripId | null): New
     accuracyM: location.accuracyM,
     altitudeM: location.altitudeM,
     altitudeAccuracyM: null,
-    origin: 'photo',
+    origin: location.origin,
     tripId,
+  };
+}
+
+/** A draft placed by hand, with no accuracy or altitude, since nothing measured them. */
+export function placeDraft(draft: PhotoDraft, { lat, lon }: LatLon): PhotoDraft {
+  return {
+    ...draft,
+    location: { lat, lon, accuracyM: null, altitudeM: null, gpsAt: null, origin: 'placed' },
   };
 }
 
@@ -174,6 +184,7 @@ function readLocation(tags: ExifTags): DraftLocation | null {
           : altitude
         : null,
     gpsAt: gpsTime(tags.gpsDateStamp, tags.gpsTimeStamp),
+    origin: 'photo',
   };
 }
 

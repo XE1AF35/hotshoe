@@ -6,6 +6,7 @@ import { StorageFullError } from '../../db/errors.ts';
 import * as photosRepo from '../../db/photos.ts';
 import { listPhotos } from '../../db/photos.ts';
 import type { Entry } from '../../db/schema.ts';
+import { setSetting } from '../../db/settings.ts';
 import { addTrip, setActiveTrip } from '../../db/trips.ts';
 import { offsetOnlyZone } from '../../lib/time.ts';
 import { createTestDb } from '../../test/db.ts';
@@ -84,6 +85,10 @@ function rowNames(sheet: HTMLElement): string[] {
   return within(sheet)
     .getAllByRole('checkbox')
     .map((box) => (box.closest('label')?.textContent ?? '').slice(0, 12));
+}
+
+function fail(message: string): never {
+  throw new Error(message);
 }
 
 async function entriesWithPhotos(db: HotshoeDb) {
@@ -253,6 +258,96 @@ describe('From photos', () => {
       Date.parse('2026-10-13T21:35:12Z'),
       Date.parse('2026-10-13T20:15:00Z'),
     ]);
+  });
+
+  it('places a photo with no location from pasted coordinates', async () => {
+    const db = createTestDb();
+    const sheet = await pick(db, [
+      photoFile('IMG_0001.JPG', {
+        dateTimeOriginal: '2026:10:14 10:40:00',
+        offsetTimeOriginal: '+13:00',
+      }),
+    ]);
+
+    await within(sheet).findByRole('checkbox', { name: /IMG_0001.*No location/ });
+    const confirm = within(sheet).getByRole('button', { name: 'Add 1 entry' });
+    expect(confirm).toHaveProperty('disabled', true);
+    expect(
+      within(sheet).queryByRole('button', { name: /Same place as the previous photo/ }),
+    ).toBeNull();
+
+    const field = within(sheet).getByLabelText('Coordinates for IMG_0001.JPG');
+    fireEvent.change(field, { target: { value: 'Auckland' } });
+    expect(within(sheet).getByText(/can't read those coordinates/)).toBeDefined();
+    expect(confirm).toHaveProperty('disabled', true);
+
+    fireEvent.change(field, { target: { value: `36°50'54,5"S; 174°45'48,0"E` } });
+    expect(within(sheet).queryByText(/can't read/)).toBeNull();
+    within(sheet).getByRole('checkbox', { name: /IMG_0001.*Placed by hand/ });
+    expect(within(sheet).queryByRole('checkbox', { name: /No location/ })).toBeNull();
+    fireEvent.click(confirm);
+
+    await screen.findByText('Added 1 entry.');
+    expect(await listEntries(db)).toEqual([
+      expect.objectContaining({
+        origin: 'placed',
+        lat: expect.closeTo(-36.848472, 6),
+        lon: expect.closeTo(174.763333, 6),
+        accuracyM: null,
+        altitudeM: null,
+        fixAt: Date.parse('2026-10-13T21:40:00Z'),
+      }),
+    ]);
+  });
+
+  it('places a run of photos at the same place as the previous one with a location', async () => {
+    const db = createTestDb();
+    // Shown to a tenth of a second of arc, coarser than the location copied.
+    await setSetting(db, 'coordFormat', 'dms');
+    const at = (time: string): ExifFields => ({
+      dateTimeOriginal: `2026:10:14 ${time}`,
+      offsetTimeOriginal: '+13:00',
+    });
+    const sheet = await pick(db, [
+      photoFile('IMG_0003.JPG', at('10:50:00')),
+      photoFile('IMG_0000.JPG', at('10:00:00')),
+      photoFile('IMG_0002.JPG', at('10:45:00')),
+      photoFile('IMG_0001.JPG', harbour),
+    ]);
+
+    await within(sheet).findAllByRole('checkbox');
+    expect(rowNames(sheet)).toEqual([
+      'IMG_0000.JPG',
+      'IMG_0001.JPG',
+      'IMG_0002.JPG',
+      'IMG_0003.JPG',
+    ]);
+    const sameAs = (name: string) =>
+      within(sheet).queryByRole('button', { name: `Same place as the previous photo for ${name}` });
+    // Nothing earlier has a location.
+    expect(sameAs('IMG_0000.JPG')).toBeNull();
+    expect(sameAs('IMG_0001.JPG')).toBeNull();
+
+    fireEvent.click(sameAs('IMG_0003.JPG') ?? fail('IMG_0003.JPG has no Same place'));
+    fireEvent.click(sameAs('IMG_0002.JPG') ?? fail('IMG_0002.JPG has no Same place'));
+    await within(sheet).findByRole('checkbox', { name: /IMG_0003.*Placed by hand/ });
+    within(sheet).getByRole('checkbox', { name: /IMG_0002.*Placed by hand/ });
+
+    fireEvent.click(within(sheet).getByRole('checkbox', { name: /IMG_0000/ }));
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Add 3 entries' }));
+
+    await screen.findByText('Added 3 entries.');
+    const [last, middle, first] = await listEntries(db);
+    expect(first).toMatchObject({ origin: 'photo', accuracyM: 8 });
+    for (const placed of [middle, last]) {
+      expect(placed).toMatchObject({
+        origin: 'placed',
+        lat: first?.lat,
+        lon: first?.lon,
+        accuracyM: null,
+        altitudeM: null,
+      });
+    }
   });
 
   it('adds to no trip when that is chosen', async () => {

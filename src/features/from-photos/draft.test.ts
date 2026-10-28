@@ -123,6 +123,7 @@ describe('readPhotoDraft', () => {
       accuracyM: 8,
       altitudeM: 12.5,
       gpsAt: Date.parse('2026-10-14T03:35:13.500Z'),
+      origin: 'photo',
     });
   });
 
@@ -148,6 +149,7 @@ describe('readPhotoDraft', () => {
       accuracyM: null,
       altitudeM: -430.5,
       gpsAt: null,
+      origin: 'photo',
     });
   });
 
