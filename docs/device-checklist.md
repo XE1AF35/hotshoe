@@ -43,7 +43,7 @@ Automated tests run in WebKit, which is close to iOS Safari but not the same. Ru
 - [ ] View an area, then turn on flight mode and reopen the map: that area still shows.
 - [ ] In Entries, tap a Day's date to open its map: one finger over the map scrolls the page, and two fingers move the map.
 - [ ] Open several Days one after another: each opens promptly, and the app stays responsive.
-- [ ] Tap **Trail** on the Map tab and on a Day map, in light and dark mode: the amber line and its dark edge stand out from the map and the pins, and it draws itself smoothly from the first pin to the last in about two seconds. If the draw-in stutters, switch to growing the line in a few steps over the same two seconds.
+- [ ] Tap **Trail** on the Map tab and on a Day map, in light and dark mode: the amber line stands out from the map and the pins, and it draws itself smoothly from the first pin to the last in about two seconds. If the draw-in stutters, switch to growing the line in a few steps over the same two seconds.
 - [ ] With Reduce Motion on, tap **Trail**: the whole line appears at once.
 
 ## Storage and accessibility

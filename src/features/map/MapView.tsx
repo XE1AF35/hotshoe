@@ -16,7 +16,6 @@ import type { Trail } from './trail.ts';
 const sourceId = 'entries';
 const trailSourceId = 'trail';
 const layers = {
-  trailEdge: 'trail-edge',
   trail: 'trail',
   clusters: 'entry-clusters',
   clusterCounts: 'entry-cluster-counts',
@@ -27,14 +26,8 @@ const layers = {
 /** How long the Trail takes to draw itself, however long it is. */
 const trailDrawMs = 2000;
 
-/**
- * The Trail's two lines: a wider dark edge, so it stands out on light and dark maps and from the
- * yellow pins, under the amber line. On-accent is dark in both themes, unlike accent-ink.
- */
-const trailLayers = [
-  { id: layers.trailEdge, token: 'on-accent', width: 7 },
-  { id: layers.trail, token: 'accent', width: 4 },
-] as const;
+/** The Trail is one plain amber line with no edge, so the map stays clean. */
+const trailWidth = 5;
 
 /** Taps this close to a point count as hitting it, so each point is at least a 24 px target. */
 const tapSlopPx = 14;
@@ -143,17 +136,17 @@ export default function MapView({
     setTrailData(map, latest.current.points.trail);
     if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
       trailDrawn.current = 1;
-      setTrailDrawn(map, trailPaint(), 1);
+      setTrailDrawn(map, token('accent'), 1);
       return;
     }
-    // Colours are read once per draw, and again when a theme switch changes them.
-    let paint = trailPaint();
+    // The colour is read once per draw, and again when a theme switch might change it.
+    let colour = token('accent');
     let frame = 0;
     let started = false;
     const step = (start: number, now: number) => {
       const drawn = Math.min((now - start) / trailDrawMs, 1);
       trailDrawn.current = drawn;
-      setTrailDrawn(map, paint, drawn);
+      setTrailDrawn(map, colour, drawn);
       if (drawn < 1) frame = requestAnimationFrame((next) => step(start, next));
     };
     const begin = () => {
@@ -162,11 +155,11 @@ export default function MapView({
     };
     // Runs after the map's own handler has added the layers back.
     const onStyleLoad = () => {
-      paint = trailPaint();
+      colour = token('accent');
       if (!started) begin();
     };
     trailDrawn.current = 0;
-    setTrailDrawn(map, paint, 0);
+    setTrailDrawn(map, colour, 0);
     // Before the style first loads there is no line yet, so the draw-in waits for it.
     if (map.getLayer(layers.trail)) begin();
     map.on('style.load', onStyleLoad);
@@ -248,24 +241,13 @@ function setTrailData(map: MapLibreMap | null, trail: Trail | null) {
   map?.getSource<GeoJSONSource>(trailSourceId)?.setData(trail ?? noTrail);
 }
 
-type TrailPaint = readonly {
-  readonly id: string;
-  readonly colour: string;
-  readonly width: number;
-}[];
-
-/** The Trail's layers with their colours, read from the stylesheet as the theme is now. */
-function trailPaint(): TrailPaint {
-  return trailLayers.map(({ id, token: name, width }) => ({ id, colour: token(name), width }));
-}
-
 /**
  * Shows the Trail from its start to this share of its length, by changing only its colour along
  * the line, so the data isn't sent again each frame.
  */
-function setTrailDrawn(map: MapLibreMap, paint: TrailPaint, drawn: number) {
-  for (const { id, colour } of paint) {
-    if (map.getLayer(id)) map.setPaintProperty(id, 'line-gradient', trailGradient(colour, drawn));
+function setTrailDrawn(map: MapLibreMap, colour: string, drawn: number) {
+  if (map.getLayer(layers.trail)) {
+    map.setPaintProperty(layers.trail, 'line-gradient', trailGradient(colour, drawn));
   }
 }
 
@@ -289,17 +271,15 @@ function addEntryLayers(
   const raised = token('raised');
 
   // The Trail joins every entry where it really is, so it has its own unclustered source. Its
-  // layers go first, under the clusters and pins, so the pins stay easy to tap.
+  // layer goes first, under the clusters and pins, so the pins stay easy to tap.
   map.addSource(trailSourceId, { type: 'geojson', data: trail ?? noTrail, lineMetrics: true });
-  for (const { id, colour, width } of trailPaint()) {
-    map.addLayer({
-      id,
-      type: 'line',
-      source: trailSourceId,
-      layout: { 'line-cap': 'round', 'line-join': 'round' },
-      paint: { 'line-width': width, 'line-gradient': trailGradient(colour, trailDrawn) },
-    });
-  }
+  map.addLayer({
+    id: layers.trail,
+    type: 'line',
+    source: trailSourceId,
+    layout: { 'line-cap': 'round', 'line-join': 'round' },
+    paint: { 'line-width': trailWidth, 'line-gradient': trailGradient(accent, trailDrawn) },
+  });
 
   map.addSource(sourceId, {
     type: 'geojson',
