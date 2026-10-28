@@ -1,4 +1,4 @@
-// Loaded only when the Map tab opens: MapLibre is far larger than the rest of the app.
+// Loaded only with a map, on the Map tab or a Day map: MapLibre is far larger than the rest of the app.
 import type { GeoJSONSource, LngLatBoundsLike, Map as MapLibreMap } from 'maplibre-gl';
 import { useEffect, useRef, useState } from 'react';
 import type { EntryId } from '../../db/schema.ts';
@@ -29,6 +29,7 @@ export default function MapView({
   selectedId,
   focus,
   onSelect,
+  cooperativeGestures = false,
 }: {
   readonly points: Points;
   /** The map zooms to fit the points when this changes, for example a different trip. */
@@ -36,6 +37,8 @@ export default function MapView({
   readonly selectedId: EntryId | null;
   readonly focus: MapFocus | null;
   readonly onSelect: (id: EntryId | null) => void;
+  /** One finger scrolls the page and two move the map, for a map inside a scrolling list. */
+  readonly cooperativeGestures?: boolean;
 }) {
   const container = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -45,11 +48,14 @@ export default function MapView({
   const latest = useRef({ points, selectedId, onSelect });
   latest.current = { points, selectedId, onSelect };
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the map is made once; its gestures are fixed for its life.
   useEffect(() => {
     const element = container.current;
     if (!element) return;
 
-    const made = createMap(element, initialView(latest.current.points.bounds), setProblem);
+    const made = createMap(element, initialView(latest.current.points.bounds), setProblem, {
+      cooperativeGestures,
+    });
     if (!made) return;
     const { map } = made;
     mapRef.current = map;

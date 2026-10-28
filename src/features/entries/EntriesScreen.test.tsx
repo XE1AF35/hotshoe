@@ -193,6 +193,91 @@ describe('EntriesScreen', () => {
     expect(await db.entries.get(entry.id)).toEqual(entry);
   });
 
+  it("opens and closes a Day's map from its heading, asking before loading it", async () => {
+    const db = createTestDb();
+    // 14 October 2026 in Auckland.
+    await addEntry(db, newEntryInput({ loggedAt: Date.parse('2026-10-14T01:00:00Z') }));
+    await addEntry(db, newEntryInput({ loggedAt: Date.parse('2026-10-14T02:00:00Z') }));
+    renderEntries(db);
+
+    const heading = await screen.findByRole('button', { name: /Wednesday, 14 October 2026/ });
+    expect(heading.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('region', { name: /^Map of/ })).toBeNull();
+
+    fireEvent.click(heading);
+    expect(heading.getAttribute('aria-expanded')).toBe('true');
+    const box = screen.getByRole('region', { name: 'Map of Wednesday, 14 October 2026' });
+    expect(heading.getAttribute('aria-controls')).toBe(box.id);
+    expect(within(box).getByText('2 entries to show')).toBeDefined();
+    expect(within(box).getByRole('button', { name: 'Load map' })).toBeDefined();
+    // The section is still named by its date alone.
+    expect(screen.getByRole('region', { name: 'Wednesday, 14 October 2026' })).toBeDefined();
+
+    fireEvent.click(heading);
+    expect(heading.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('region', { name: /^Map of/ })).toBeNull();
+  });
+
+  it('keeps only one Day open at a time', async () => {
+    const db = createTestDb();
+    await addEntry(db, newEntryInput({ loggedAt: Date.parse('2026-10-14T01:00:00Z') }));
+    await addEntry(db, newEntryInput({ loggedAt: Date.parse('2026-10-15T01:00:00Z') }));
+    renderEntries(db);
+
+    const earlier = await screen.findByRole('button', { name: /Wednesday, 14 October 2026/ });
+    const later = screen.getByRole('button', { name: /Thursday, 15 October 2026/ });
+    fireEvent.click(earlier);
+    fireEvent.click(later);
+
+    expect(earlier.getAttribute('aria-expanded')).toBe('false');
+    expect(later.getAttribute('aria-expanded')).toBe('true');
+    expect(screen.getAllByRole('region', { name: /^Map of/ })).toHaveLength(1);
+    expect(screen.getByRole('region', { name: 'Map of Thursday, 15 October 2026' })).toBeDefined();
+  });
+
+  it('closes the open Day when its last entry is deleted, even after undo', async () => {
+    const db = createTestDb();
+    await addEntry(
+      db,
+      newEntryInput({ loggedAt: Date.parse('2026-10-14T01:00:00Z'), label: 'Wharf' }),
+    );
+    renderEntries(db);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Wednesday, 14 October 2026/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Wharf/ }));
+    const sheet = await screen.findByRole('dialog', { name: 'Entry' });
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Delete entry' }));
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Delete' }));
+    await waitFor(() => expect(screen.queryByRole('region', { name: /^Map of/ })).toBeNull());
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Undo' }));
+    const heading = await screen.findByRole('button', { name: /Wednesday, 14 October 2026/ });
+    expect(heading.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('region', { name: /^Map of/ })).toBeNull();
+  });
+
+  it('closes the open Day when its last entry moves to another Day', async () => {
+    const db = createTestDb();
+    // 14:00 on 14 October 2026 in Auckland.
+    await addEntry(
+      db,
+      newEntryInput({ loggedAt: Date.parse('2026-10-14T01:00:00Z'), label: 'Wharf' }),
+    );
+    renderEntries(db);
+
+    fireEvent.click(await screen.findByRole('button', { name: /Wednesday, 14 October 2026/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Wharf/ }));
+    const sheet = await screen.findByRole('dialog', { name: 'Entry' });
+    fireEvent.change(within(sheet).getByLabelText('Date and time'), {
+      target: { value: '2026-10-16T09:15' },
+    });
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Save' }));
+
+    const moved = await screen.findByRole('button', { name: /Friday, 16 October 2026/ });
+    expect(moved.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('region', { name: /^Map of/ })).toBeNull();
+  });
+
   it('deletes after confirming, and undo brings the entry back', async () => {
     const db = createTestDb();
     await addEntry(db, newEntryInput({ label: 'Wharf' }));

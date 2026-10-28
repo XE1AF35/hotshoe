@@ -41,6 +41,8 @@ Automated tests run in WebKit, which is close to iOS Safari but not the same. Ru
 - [ ] With the map open, change **Appearance** in Settings: the map switches to match.
 - [ ] Tap a point: its card shows the thumbnail and copies coordinates.
 - [ ] View an area, then turn on flight mode and reopen the map: that area still shows.
+- [ ] In Entries, tap a Day's date to open its map: one finger over the map scrolls the page, and two fingers move the map.
+- [ ] Open several Days one after another: each opens promptly, and the app stays responsive.
 
 ## Storage and accessibility
 

@@ -26,11 +26,15 @@ export const wholeWorld: MapStart = { center: [0, 20], zoom: 1 };
  * Makes a map in the app's style, with zoom buttons and the OpenStreetMap credit, following
  * light and dark mode. Reports a problem when the map can't be shown, and null once it can.
  * Returns how to take it down, or null when this device can't make a map at all.
+ *
+ * With cooperative gestures, one finger scrolls the page and two fingers move the map, for a map
+ * that sits inside a scrolling list.
  */
 export function createMap(
   element: HTMLElement,
   start: MapStart,
   onProblem: (problem: string | null) => void,
+  { cooperativeGestures = false }: { readonly cooperativeGestures?: boolean } = {},
 ): { readonly map: MapLibreMap; readonly remove: () => void } | null {
   let map: MapLibreMap;
   try {
@@ -39,6 +43,7 @@ export function createMap(
       style: mapStyleUrl(currentTheme() === 'dark'),
       ...start,
       attributionControl: false,
+      cooperativeGestures,
       maxZoom: 18,
     });
   } catch {

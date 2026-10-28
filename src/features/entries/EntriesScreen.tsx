@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CameraIcon } from '../../app/icons.tsx';
+import { type ReactNode, useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { CameraIcon, ChevronIcon } from '../../app/icons.tsx';
 import { ScreenHeader } from '../../app/ScreenHeader.tsx';
 import { Toast } from '../../app/Toast.tsx';
 import { useDb } from '../../db/DbProvider.tsx';
@@ -11,7 +11,9 @@ import { useSettings } from '../../db/SettingsProvider.tsx';
 import type { Entry, EntryId, Trip, TripId } from '../../db/schema.ts';
 import { coordStyleOf } from '../../db/settings.ts';
 import { formatCount, formatDay, formatLoggedClock } from '../../lib/format.ts';
+import type { DayKey } from '../../lib/time.ts';
 import { useObjectUrl } from '../../lib/useObjectUrl.ts';
+import { DayMap } from './DayMap.tsx';
 import { EntrySheet } from './EntrySheet.tsx';
 import { type DayGroup, groupByDayAndTrip } from './grouping.ts';
 import { SelectionBar } from './SelectionBar.tsx';
@@ -28,6 +30,8 @@ export function EntriesScreen() {
   // Select mode: tick entries to export just those.
   const [selecting, setSelecting] = useState(false);
   const [picked, setPicked] = useState<ReadonlySet<EntryId>>(new Set());
+  // The one Day whose map is open. Never stored, so leaving the tab closes it.
+  const [openDay, setOpenDay] = useState<DayKey | null>(null);
 
   function toggle(id: EntryId) {
     setPicked((current) => {
@@ -43,6 +47,13 @@ export function EntriesScreen() {
   );
   const days = useMemo(() => groupByDayAndTrip(entries ?? [], tripsById), [entries, tripsById]);
   const openEntry = entries?.find((entry) => entry.id === openId) ?? null;
+
+  // A Day that loses its last entry closes, and stays closed if the entry comes back.
+  useEffect(() => {
+    if (openDay !== null && entries !== undefined && !days.some((day) => day.day === openDay)) {
+      setOpenDay(null);
+    }
+  }, [openDay, entries, days]);
 
   return (
     <section aria-labelledby="screen-title" className="space-y-6">
@@ -68,12 +79,13 @@ export function EntriesScreen() {
       )}
 
       {days.map((day) => (
-        <section key={day.day} aria-labelledby={`day-${day.day}`} className="space-y-3">
-          {/* The count wraps under the date at large text sizes. The date alone names the section. */}
-          <h2 className="flex flex-wrap items-baseline gap-x-2 font-semibold text-lg">
-            <span id={`day-${day.day}`}>{formatDay(day.day)}</span>
-            <span className="font-normal text-muted text-sm">{entryCountLabel(day)}</span>
-          </h2>
+        <DaySection
+          key={day.day}
+          day={day}
+          open={day.day === openDay}
+          onToggle={() => setOpenDay(day.day === openDay ? null : day.day)}
+          onOpenEntry={setOpenId}
+        >
           {day.trips.map((group) => (
             <div key={group.trip?.id ?? 'none'} className="space-y-1.5">
               <h3 className="px-1 font-semibold text-muted text-xs uppercase tracking-widest">
@@ -97,7 +109,7 @@ export function EntriesScreen() {
               </ul>
             </div>
           ))}
-        </section>
+        </DaySection>
       ))}
 
       {selecting && entries !== undefined && (
@@ -130,6 +142,61 @@ export function EntriesScreen() {
           onDismiss={dismissToast}
         />
       )}
+    </section>
+  );
+}
+
+/**
+ * A Day's entries under a heading that opens and closes its map. The map sits after the entries,
+ * so the date stays at the top and the entries come first.
+ */
+function DaySection({
+  day,
+  open,
+  onToggle,
+  onOpenEntry,
+  children,
+}: {
+  readonly day: DayGroup;
+  readonly open: boolean;
+  readonly onToggle: () => void;
+  readonly onOpenEntry: (id: EntryId) => void;
+  readonly children: ReactNode;
+}) {
+  const mapId = useId();
+  const button = useRef<HTMLButtonElement>(null);
+
+  // Opening a Day brings its heading to the top, with its entries and then its map below.
+  useEffect(() => {
+    if (!open) return;
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    button.current?.scrollIntoView?.({
+      block: 'start',
+      behavior: reduceMotion ? 'auto' : 'smooth',
+    });
+  }, [open]);
+
+  return (
+    <section aria-labelledby={`day-${day.day}`} className="space-y-3">
+      <h2 className="font-semibold text-lg">
+        {/* The count and chevron wrap under the date at large text sizes. The date alone names the section. */}
+        <button
+          ref={button}
+          type="button"
+          aria-expanded={open}
+          aria-controls={open ? mapId : undefined}
+          onClick={onToggle}
+          className="flex min-h-11 w-full flex-wrap items-center gap-x-2 text-left"
+        >
+          <span id={`day-${day.day}`}>{formatDay(day.day)}</span>
+          <span className="font-normal text-muted text-sm">{entryCountLabel(day)}</span>
+          <ChevronIcon
+            className={`size-5 shrink-0 text-muted transition-transform motion-reduce:transition-none ${open ? 'rotate-180' : ''}`}
+          />
+        </button>
+      </h2>
+      {children}
+      {open && <DayMap id={mapId} day={day} onOpenEntry={onOpenEntry} />}
     </section>
   );
 }

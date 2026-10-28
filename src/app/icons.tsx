@@ -120,3 +120,12 @@ export function ExternalLinkIcon(props: IconProps) {
     </Svg>
   );
 }
+
+/** Points down; turned to point up when what it opens is open. */
+export function ChevronIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="m6 9 6 6 6-6" />
+    </Svg>
+  );
+}

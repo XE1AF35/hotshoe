@@ -205,3 +205,127 @@ test('places a photo with no location by dropping and dragging a pin', async ({ 
   await expect(page.getByText('Added 1 entry.')).toBeVisible();
   expect(await violations()).toEqual([]);
 });
+
+/** Logs two entries on different Days: today's, and one moved back to 1 January 2026. */
+async function logTwoDays(page: Page) {
+  await logEntry(page, 'Ferry terminal');
+  await page.getByRole('button', { name: 'Log location' }).click();
+  await expect(page.getByRole('heading', { name: 'Logged' })).toBeVisible();
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: 'Entries' })
+    .click();
+  // Labelled here with its new time, so nothing waits on the Log screen's label to save.
+  await page.getByRole('button', { name: /Untitled/ }).click();
+  const sheet = page.getByRole('dialog', { name: 'Entry' });
+  await sheet.getByLabel('Label').fill('Ferry building');
+  await sheet.getByLabel('Date and time').fill('2026-01-01T09:00');
+  await sheet.getByRole('button', { name: 'Save' }).click();
+  await expect(sheet).toBeHidden();
+}
+
+const newYear = 'Thursday, 1 January 2026';
+
+test("opens a Day's map after asking, and a pin opens its entry", async ({ page }) => {
+  await stubMapTiles(page);
+  const violations = await watchPolicyViolations(page);
+  await logTwoDays(page);
+
+  const newYearHeading = page.getByRole('button', { name: new RegExp(newYear) });
+  await newYearHeading.click();
+  await expect(newYearHeading).toHaveAttribute('aria-expanded', 'true');
+  const box = page.getByRole('region', { name: `Map of ${newYear}` });
+  await box.getByRole('button', { name: 'Load map' }).click();
+  const canvas = box.locator('canvas.maplibregl-canvas');
+  await expect(canvas).toBeVisible();
+  await expect(box.getByRole('status')).toHaveText('1 entry on the map');
+  await expect(box.locator('.maplibregl-ctrl-attrib')).toBeAttached();
+
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
+    .analyze();
+  expect(results.violations).toEqual([]);
+
+  // The Day's only pin sits in the middle of its map once the map has drawn it.
+  const sheet = page.getByRole('dialog', { name: 'Entry' });
+  await expect(async () => {
+    if (!(await sheet.isVisible())) await canvas.click({ timeout: 1000 });
+    await expect(sheet).toBeVisible({ timeout: 1000 });
+  }).toPass();
+  await expect(sheet.getByLabel('Label')).toHaveValue('Ferry building');
+  await page.keyboard.press('Escape');
+
+  // Another Day replaces it, and loads without asking again.
+  const todayHeading = page.locator('main h2 button').first();
+  await todayHeading.click();
+  await expect(newYearHeading).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.locator('canvas.maplibregl-canvas')).toHaveCount(1);
+  await expect(page.getByRole('region', { name: /^Map of/ })).toHaveCount(1);
+  await expect(page.getByRole('region', { name: /^Map of/ }).getByRole('status')).toHaveText(
+    '1 entry on the map',
+  );
+  expect(await violations()).toEqual([]);
+});
+
+test('a plain mouse wheel over a Day map shows the two-finger hint and leaves it alone', async ({
+  page,
+}) => {
+  await stubMapTiles(page);
+  await logEntry(page, 'Ferry terminal');
+  await page
+    .getByRole('navigation', { name: 'Main' })
+    .getByRole('link', { name: 'Entries' })
+    .click();
+  await page.locator('main h2 button').first().click();
+  const box = page.getByRole('region', { name: /^Map of/ });
+  await box.getByRole('button', { name: 'Load map' }).click();
+  const canvas = box.locator('canvas.maplibregl-canvas');
+  await expect(canvas).toBeVisible();
+
+  // The hint shows for only a moment, so watch for it rather than look.
+  const hinted = page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const hint = document.querySelector('.maplibregl-cooperative-gesture-screen');
+        if (!hint) throw new Error('the map has no cooperative-gestures hint');
+        new MutationObserver(() => {
+          if (hint.classList.contains('maplibregl-show')) resolve();
+        }).observe(hint, { attributes: true, attributeFilter: ['class'] });
+      }),
+  );
+  // Leave the hint out of the pictures, which compare only what the map draws. It still gets its
+  // class when shown. The Content Security Policy blocks style sheets, so this styles it directly.
+  await box
+    .locator('.maplibregl-cooperative-gesture-screen')
+    .evaluate((hint: HTMLElement) => hint.style.setProperty('visibility', 'hidden'));
+  const picture = () => canvas.screenshot();
+  let before = await picture();
+  await expect(async () => {
+    const now = await picture();
+    const settled = now.equals(before);
+    before = now;
+    expect(settled).toBe(true);
+  }).toPass();
+
+  // Mobile WebKit has no mouse wheel, so send the wheel event itself, away from the pin.
+  const size = await canvas.boundingBox();
+  if (!size) throw new Error('the map has no size');
+  const wheel = (keys: { ctrlKey?: boolean; metaKey?: boolean }) =>
+    canvas.dispatchEvent('wheel', {
+      deltaY: -400,
+      deltaMode: 0,
+      clientX: size.x + size.width / 4,
+      clientY: size.y + size.height / 4,
+      bubbles: true,
+      cancelable: true,
+      ...keys,
+    });
+  await wheel({});
+  await hinted;
+  await page.waitForTimeout(500);
+  expect((await picture()).equals(before)).toBe(true);
+
+  // The same wheel with the modifier does zoom, which shows the pictures would catch it.
+  await wheel({ ctrlKey: true, metaKey: true });
+  await expect.poll(async () => (await picture()).equals(before)).toBe(false);
+});
