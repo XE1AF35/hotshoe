@@ -2,14 +2,20 @@ import { describe, expect, it } from 'vitest';
 import { formatLoggedClock } from '../../lib/format.ts';
 import { offsetOnlyZone } from '../../lib/time.ts';
 import { type ExifFields, jpegWithExif } from '../../test/exif.ts';
-import { newEntryFromDraft, readPhotoDraft } from './draft.ts';
+import { newEntryFromDraft, readPhotoDraft, typedTime } from './draft.ts';
 
-function photo(fields: ExifFields, littleEndian = false): File {
+function photo(
+  fields: ExifFields,
+  { littleEndian = false, lastModified = Date.parse('2026-10-20T00:00:00Z') } = {},
+): File {
   return new File([jpegWithExif(fields, { littleEndian })], 'IMG_0001.JPG', {
     type: 'image/jpeg',
-    lastModified: Date.parse('2026-10-20T00:00:00Z'),
+    lastModified,
   });
 }
+
+/** Zero is how a file with no date comes through. */
+const noFileDate = 0;
 
 const shot: ExifFields = {
   dateTimeOriginal: '2026:10:14 10:35:12',
@@ -109,7 +115,7 @@ describe('readPhotoDraft', () => {
     ['big-endian', false],
     ['little-endian', true],
   ])('reads the GPS location, error, and altitude from a %s file', async (_, littleEndian) => {
-    const draft = await readPhotoDraft(photo({ ...shot, gps: auckland }, littleEndian), 'UTC');
+    const draft = await readPhotoDraft(photo({ ...shot, gps: auckland }, { littleEndian }), 'UTC');
 
     expect(draft.location).toEqual({
       lat: expect.closeTo(-36.848461, 6),
@@ -152,14 +158,14 @@ describe('readPhotoDraft', () => {
     ['truncated', jpegWithExif({ ...shot, gps: auckland }).slice(0, 60)],
     ['a JPEG without EXIF', new Uint8Array([0xff, 0xd8, 0xff, 0xd9])],
   ])('finds nothing in a file that is %s', async (_, bytes) => {
-    const draft = await readPhotoDraft(new File([bytes], 'x'), 'UTC');
+    const draft = await readPhotoDraft(new File([bytes], 'x', { lastModified: noFileDate }), 'UTC');
 
     expect(draft.time).toEqual({ source: 'missing' });
     expect(draft.location).toBeNull();
   });
 
   it('finds nothing in a file that fails to read', async () => {
-    const unreadable = new File(['x'], 'IMG_0001.JPG');
+    const unreadable = new File(['x'], 'IMG_0001.JPG', { lastModified: noFileDate });
     Object.defineProperty(unreadable, 'slice', {
       value: () => ({ arrayBuffer: () => Promise.reject(new Error('gone')) }),
     });
@@ -170,10 +176,152 @@ describe('readPhotoDraft', () => {
     expect(draft.location).toBeNull();
   });
 
+  describe('without an offset', () => {
+    const noOffset = { dateTimeOriginal: '2026:10:14 10:35:12', subSecTimeOriginal: '25' };
+    const gpsClock = { dateStamp: '2026:10:14', timeStamp: [3, 35, 13] } as const;
+
+    it('uses the GPS time, with the offset the shot time shows', async () => {
+      const draft = await readPhotoDraft(photo({ ...noOffset, gps: gpsClock }), 'Pacific/Auckland');
+
+      expect(draft.time).toEqual({
+        source: 'gps',
+        at: Date.parse('2026-10-14T03:35:13Z'),
+        context: { timeZone: offsetOnlyZone, utcOffsetMin: 420 },
+      });
+    });
+
+    it('names the iPhone zone for a GPS time when the offsets match', async () => {
+      const draft = await readPhotoDraft(photo({ ...noOffset, gps: gpsClock }), 'Asia/Bangkok');
+
+      expect(draft.time).toMatchObject({
+        source: 'gps',
+        context: { timeZone: 'Asia/Bangkok', utcOffsetMin: 420 },
+      });
+    });
+
+    it('uses the GPS time in the iPhone zone when there is no shot time', async () => {
+      const draft = await readPhotoDraft(photo({ gps: gpsClock }), 'Pacific/Auckland');
+
+      expect(draft.time).toEqual({
+        source: 'gps',
+        at: Date.parse('2026-10-14T03:35:13Z'),
+        context: { timeZone: 'Pacific/Auckland', utcOffsetMin: 780 },
+      });
+    });
+
+    it('reads a shot time with no GPS time in the iPhone zone', async () => {
+      const draft = await readPhotoDraft(photo(noOffset), 'Pacific/Auckland');
+
+      expect(draft.time).toEqual({
+        source: 'zone-assumed',
+        at: Date.parse('2026-10-13T21:35:12.250Z'),
+        context: { timeZone: 'Pacific/Auckland', utcOffsetMin: 780 },
+      });
+    });
+
+    // New Zealand daylight time began at 2 am on 27 September 2026 and ended at 3 am on 5 April.
+    // New York's began at 2 am on 8 March and ends at 2 am on 1 November.
+    it.each([
+      [
+        'just before daylight time',
+        'Pacific/Auckland',
+        '2026:09:27 01:30:00',
+        '2026-09-26T13:30:00Z',
+        720,
+      ],
+      [
+        'skipped as daylight time began',
+        'Pacific/Auckland',
+        '2026:09:27 02:30:00',
+        '2026-09-26T14:30:00Z',
+        780,
+      ],
+      [
+        'just after daylight time began',
+        'Pacific/Auckland',
+        '2026:09:27 03:30:00',
+        '2026-09-26T14:30:00Z',
+        780,
+      ],
+      [
+        'shown twice as daylight time ended',
+        'Pacific/Auckland',
+        '2026:04:05 02:30:00',
+        '2026-04-04T13:30:00Z',
+        780,
+      ],
+      [
+        'skipped behind UTC',
+        'America/New_York',
+        '2026:03:08 02:30:00',
+        '2026-03-08T07:30:00Z',
+        -240,
+      ],
+      [
+        'just after daylight time began behind UTC',
+        'America/New_York',
+        '2026:03:08 03:30:00',
+        '2026-03-08T07:30:00Z',
+        -240,
+      ],
+      [
+        'shown twice behind UTC',
+        'America/New_York',
+        '2026:11:01 01:30:00',
+        '2026-11-01T05:30:00Z',
+        -240,
+      ],
+    ])('assumes the zone for a time %s', async (_, zone, dateTimeOriginal, at, utcOffsetMin) => {
+      const draft = await readPhotoDraft(photo({ dateTimeOriginal }), zone);
+
+      expect(draft.time).toEqual({
+        source: 'zone-assumed',
+        at: Date.parse(at),
+        context: { timeZone: zone, utcOffsetMin },
+      });
+    });
+  });
+
+  it('uses the file date in the iPhone zone when there is no shot or GPS time', async () => {
+    const lastModified = Date.parse('2026-10-13T21:35:12Z');
+    const draft = await readPhotoDraft(photo({}, { lastModified }), 'Pacific/Auckland');
+
+    expect(draft.time).toEqual({
+      source: 'file-date',
+      at: lastModified,
+      context: { timeZone: 'Pacific/Auckland', utcOffsetMin: 780 },
+    });
+  });
+
+  it('finds no time when the file has no date either', async () => {
+    const draft = await readPhotoDraft(photo({}, { lastModified: noFileDate }), 'UTC');
+    expect(draft.time).toEqual({ source: 'missing' });
+  });
+
   it('finds no location when the GPS has no coordinates', async () => {
     const draft = await readPhotoDraft(photo({ ...shot, gps: { altitude: 12 } }), 'UTC');
     expect(draft.location).toBeNull();
   });
+});
+
+describe('typedTime', () => {
+  it.each([
+    ['2026-10-14T10:35', '2026-10-13T21:35:00Z'],
+    ['2026-10-14T10:35:12', '2026-10-13T21:35:12Z'],
+  ])('reads %s in the iPhone zone', (text, at) => {
+    expect(typedTime(text, 'Pacific/Auckland')).toEqual({
+      source: 'typed',
+      at: Date.parse(at),
+      context: { timeZone: 'Pacific/Auckland', utcOffsetMin: 780 },
+    });
+  });
+
+  it.each([[''], ['2026-10-14'], ['2026-13-01T10:35'], ['2026-02-31T10:35'], ['soon']])(
+    'finds no time in %j',
+    (text) => {
+      expect(typedTime(text, 'Pacific/Auckland')).toEqual({ source: 'missing' });
+    },
+  );
 });
 
 describe('newEntryFromDraft', () => {
@@ -203,8 +351,9 @@ describe('newEntryFromDraft', () => {
   });
 
   it('makes nothing from a draft missing its time or location', async () => {
+    const { dateStamp: _, timeStamp: __, ...gps } = auckland;
     const noLocation = await readPhotoDraft(photo(shot), 'UTC');
-    const noTime = await readPhotoDraft(photo({ gps: auckland }), 'UTC');
+    const noTime = await readPhotoDraft(photo({ gps }, { lastModified: noFileDate }), 'UTC');
 
     expect(newEntryFromDraft(noLocation, null)).toBeNull();
     expect(newEntryFromDraft(noTime, null)).toBeNull();

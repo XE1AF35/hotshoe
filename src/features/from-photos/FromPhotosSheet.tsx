@@ -10,7 +10,7 @@ import { formatCount, formatLoggedTime } from '../../lib/format.ts';
 import { useObjectUrl } from '../../lib/useObjectUrl.ts';
 import { describeAccuracy } from '../capture/capture.ts';
 import { TripSelect } from '../trips/TripSelect.tsx';
-import { isComplete, type PhotoDraft, readPhotoDraft } from './draft.ts';
+import { isComplete, type PhotoDraft, readPhotoDraft, typedTime } from './draft.ts';
 import { type SaveResult, saveDrafts } from './save.ts';
 
 interface Row {
@@ -18,6 +18,8 @@ interface Row {
   readonly key: number;
   readonly draft: PhotoDraft;
   readonly ticked: boolean;
+  /** The date and time field's value, for a photo whose time couldn't be found. */
+  readonly typed: string;
 }
 
 /**
@@ -37,32 +39,33 @@ export function FromPhotosSheet({
   const trips = useTrips();
   const activeTrip = useActiveTrip();
   const tripSelectId = useId();
-  const [rows, setRows] = useState<readonly Row[] | null>(null);
+  const [deviceZone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone);
+  // In picked order; shown in time order, which can change as times are typed.
+  const [picked, setPicked] = useState<readonly Row[] | null>(null);
   const [chosenTrip, setChosenTrip] = useState<TripId | null | undefined>(undefined);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let current = true;
-    const deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     void Promise.all(files.map((file) => readPhotoDraft(file, deviceZone))).then((drafts) => {
-      if (current) {
-        setRows(inShotOrder(drafts.map((draft, key) => ({ key, draft, ticked: true }))));
-      }
+      if (current) setPicked(drafts.map((draft, key) => ({ key, draft, ticked: true, typed: '' })));
     });
     return () => {
       current = false;
     };
-  }, [files]);
+  }, [files, deviceZone]);
+
+  const rows = picked && inShotOrder(picked.map((row) => withTypedTime(row, deviceZone)));
 
   const tripId = chosenTrip === undefined ? (activeTrip?.id ?? null) : chosenTrip;
   const ticked = rows?.filter((row) => row.ticked) ?? [];
-  const incomplete = ticked.some(({ draft }) => !isComplete(draft));
-  const canConfirm = ticked.length > 0 && !incomplete && !saving;
+  const untimed = ticked.some(({ draft }) => draft.time.source === 'missing');
+  const unplaced = ticked.some(({ draft }) => draft.location === null);
+  const canConfirm = ticked.length > 0 && ticked.every(({ draft }) => isComplete(draft)) && !saving;
 
-  function toggle(key: number) {
-    setRows(
-      (current) =>
-        current?.map((row) => (row.key === key ? { ...row, ticked: !row.ticked } : row)) ?? null,
+  function change(key: number, update: Partial<Pick<Row, 'ticked' | 'typed'>>) {
+    setPicked(
+      (current) => current?.map((row) => (row.key === key ? { ...row, ...update } : row)) ?? null,
     );
   }
 
@@ -86,11 +89,11 @@ export function FromPhotosSheet({
             {rows.map((row) => (
               <li key={row.key}>
                 <DraftRow
-                  draft={row.draft}
-                  ticked={row.ticked}
+                  row={row}
                   disabled={saving}
                   coordStyle={coordStyleOf(settings)}
-                  onToggle={() => toggle(row.key)}
+                  onToggle={() => change(row.key, { ticked: !row.ticked })}
+                  onType={(typed) => change(row.key, { typed })}
                 />
               </li>
             ))}
@@ -103,9 +106,14 @@ export function FromPhotosSheet({
             <TripSelect id={tripSelectId} trips={trips} value={tripId} onChange={setChosenTrip} />
           </div>
 
-          {incomplete && (
+          {untimed && (
             <p className="text-accent-ink text-sm">
-              Untick the photos with no time or location to add the rest.
+              Type the date and time for each photo with none, or untick it.
+            </p>
+          )}
+          {unplaced && (
+            <p className="text-accent-ink text-sm">
+              Untick the photos with no location to add the rest.
             </p>
           )}
 
@@ -134,62 +142,83 @@ export function FromPhotosSheet({
 }
 
 /**
- * One photo. The whole row labels its tick, so VoiceOver reads the photo, time, location, and
- * flags together.
+ * One photo. The tick's label holds the photo, time, location, and flags, so VoiceOver reads them
+ * together. A photo with no time found gets a date and time field below.
  */
 function DraftRow({
-  draft,
-  ticked,
+  row,
   disabled,
   coordStyle,
   onToggle,
+  onType,
 }: {
-  readonly draft: PhotoDraft;
-  readonly ticked: boolean;
+  readonly row: Row;
   readonly disabled: boolean;
   readonly coordStyle: CoordStyle;
   readonly onToggle: () => void;
+  readonly onType: (typed: string) => void;
 }) {
-  const thumb = useObjectUrl(draft.file);
-  const { time, location } = draft;
+  const thumb = useObjectUrl(row.draft.file);
+  const timeFieldId = useId();
+  const { file, time, location } = row.draft;
+  const needsTime = time.source === 'missing' || time.source === 'typed';
 
   return (
-    <label className="flex min-h-12 items-start gap-3 rounded-xl p-2 has-checked:bg-surface">
-      <input
-        type="checkbox"
-        checked={ticked}
-        disabled={disabled}
-        onChange={onToggle}
-        className="mt-1 size-5 shrink-0 accent-accent-ink"
-      />
-      <span className="size-16 shrink-0 overflow-hidden rounded-lg bg-surface ring-1 ring-line">
-        {thumb && (
-          <img
-            src={thumb}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            className="size-full object-cover"
+    <div className="rounded-xl p-2 has-checked:bg-surface">
+      <label className="flex min-h-12 items-start gap-3">
+        <input
+          type="checkbox"
+          checked={row.ticked}
+          disabled={disabled}
+          onChange={onToggle}
+          className="mt-1 size-5 shrink-0 accent-accent-ink"
+        />
+        <span className="size-16 shrink-0 overflow-hidden rounded-lg bg-surface ring-1 ring-line">
+          {thumb && (
+            <img
+              src={thumb}
+              alt=""
+              loading="lazy"
+              decoding="async"
+              className="size-full object-cover"
+            />
+          )}
+        </span>
+        <span className="flex min-w-0 flex-col gap-0.5 text-sm">
+          <span className="break-all font-medium">{file.name}</span>
+          {time.source === 'missing' ? (
+            <Flag>No time</Flag>
+          ) : (
+            <span>{formatLoggedTime(time.at, time.context)}</span>
+          )}
+          {time.source === 'zone-assumed' && <Flag>Time zone assumed</Flag>}
+          {time.source === 'file-date' && <Flag>Time from the file date</Flag>}
+          {location === null ? (
+            <Flag>No location</Flag>
+          ) : (
+            <span className="text-muted">
+              <span className="font-mono tabular-nums">{formatCoords(location, coordStyle)}</span>{' '}
+              {describeAccuracy({ accuracyM: location.accuracyM, origin: 'photo' })}
+            </span>
+          )}
+        </span>
+      </label>
+      {needsTime && (
+        <div className="mt-2 space-y-1 pl-8">
+          <label htmlFor={timeFieldId} className="block text-muted text-sm">
+            Date and time<span className="sr-only"> for {file.name}</span>
+          </label>
+          <input
+            id={timeFieldId}
+            type="datetime-local"
+            value={row.typed}
+            disabled={disabled}
+            onChange={(event) => onType(event.target.value)}
+            className="min-h-12 w-full min-w-0 rounded-xl border border-line bg-raised px-3 text-base"
           />
-        )}
-      </span>
-      <span className="flex min-w-0 flex-col gap-0.5 text-sm">
-        <span className="break-all font-medium">{draft.file.name}</span>
-        {time.source === 'missing' ? (
-          <Flag>No time</Flag>
-        ) : (
-          <span>{formatLoggedTime(time.at, time.context)}</span>
-        )}
-        {location === null ? (
-          <Flag>No location</Flag>
-        ) : (
-          <span className="text-muted">
-            <span className="font-mono tabular-nums">{formatCoords(location, coordStyle)}</span>{' '}
-            {describeAccuracy({ accuracyM: location.accuracyM, origin: 'photo' })}
-          </span>
-        )}
-      </span>
-    </label>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -199,6 +228,12 @@ function Flag({ children }: { readonly children: string }) {
       {children}
     </span>
   );
+}
+
+/** A row whose photo had no time, with the time typed for it, if any. */
+function withTypedTime(row: Row, deviceZone: string): Row {
+  if (row.draft.time.source !== 'missing') return row;
+  return { ...row, draft: { ...row.draft, time: typedTime(row.typed, deviceZone) } };
 }
 
 /** Oldest shot first; photos with no time keep their picked order, after the rest. */

@@ -57,6 +57,22 @@ export function zoneOffsetMin(epochMs: number, timeZone: string): number | null 
   return match[1] === '-' ? -minutes : minutes;
 }
 
+/**
+ * The instant a local clock reading names in a zone. `wallMs` is the reading as if it were UTC.
+ * A reading the clocks skipped as daylight time began lands just after the jump, and one they
+ * showed twice as it ended is the first. Null for a zone Intl doesn't know.
+ */
+export function instantInZone(wallMs: number, timeZone: string): number | null {
+  // Clocks change at most once in two days, so these are the offsets either side of any change.
+  const before = zoneOffsetMin(wallMs - 86_400_000, timeZone);
+  const after = zoneOffsetMin(wallMs + 86_400_000, timeZone);
+  if (before === null || after === null) return null;
+  const onBefore = wallMs - before * 60_000;
+  const onAfter = wallMs - after * 60_000;
+  const shows = (at: number, offsetMin: number) => zoneOffsetMin(at, timeZone) === offsetMin;
+  return shows(onAfter, after) && !shows(onBefore, before) ? onAfter : onBefore;
+}
+
 const dayFormatters = new Map<string, Intl.DateTimeFormat>();
 
 function dayFormatter(timeZone: string): Intl.DateTimeFormat | null {

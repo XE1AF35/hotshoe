@@ -56,12 +56,19 @@ const hanoi: ExifFields = {
   gps: { ...gps, latitudeRef: 'N', latitude: [21, 1, 42], longitude: [105, 51, 0] },
 };
 
-function photoFile(name: string, fields: ExifFields): File {
-  return new File([jpegWithExif(fields)], name, {
-    type: 'image/jpeg',
-    lastModified: Date.parse('2026-10-20T00:00:00Z'),
-  });
+function photoFile(
+  name: string,
+  fields: ExifFields,
+  lastModified = Date.parse('2026-10-20T00:00:00Z'),
+): File {
+  const file = new File([jpegWithExif(fields)], name, { type: 'image/jpeg' });
+  // Set afterwards, as happy-dom turns a zero date into now.
+  Object.defineProperty(file, 'lastModified', { value: lastModified });
+  return file;
 }
+
+/** Zero is how a file with no date comes through. */
+const noFileDate = 0;
 
 async function pick(db: HotshoeDb, files: File[]) {
   const { container } = renderWithDb(db, <LogScreen />);
@@ -70,6 +77,13 @@ async function pick(db: HotshoeDb, files: File[]) {
   if (!input) throw new Error('library input missing');
   fireEvent.change(input, { target: { files } });
   return screen.findByRole('dialog', { name: 'From photos' });
+}
+
+/** The file names of the rows, top to bottom. */
+function rowNames(sheet: HTMLElement): string[] {
+  return within(sheet)
+    .getAllByRole('checkbox')
+    .map((box) => (box.closest('label')?.textContent ?? '').slice(0, 12));
 }
 
 async function entriesWithPhotos(db: HotshoeDb) {
@@ -90,10 +104,8 @@ describe('From photos', () => {
       photoFile('IMG_0001.JPG', hanoi),
     ]);
 
-    const names = (await within(sheet).findAllByRole('checkbox')).map((box) =>
-      (box.closest('label')?.textContent ?? '').slice(0, 12),
-    );
-    expect(names).toEqual(['IMG_0001.JPG', 'IMG_0002.JPG']);
+    await within(sheet).findAllByRole('checkbox');
+    expect(rowNames(sheet)).toEqual(['IMG_0001.JPG', 'IMG_0002.JPG']);
     expect(
       within(sheet).getByRole('checkbox', { name: /IMG_0001.*9:00:00 am \(UTC\+07:00\)/ }),
     ).toHaveProperty('checked', true);
@@ -144,7 +156,7 @@ describe('From photos', () => {
     const db = createTestDb();
     // Picked in a different order from the shots, so the rows are reordered.
     const sheet = await pick(db, [
-      photoFile('IMG_0003.HEIC', {}),
+      photoFile('IMG_0003.HEIC', {}, noFileDate),
       photoFile('IMG_0002.JPG', {
         dateTimeOriginal: '2026:10:14 10:40:00',
         offsetTimeOriginal: '+13:00',
@@ -171,6 +183,76 @@ describe('From photos', () => {
 
     expect(await screen.findByText('Added 1 entry.')).toBeDefined();
     expect(await listEntries(db)).toHaveLength(1);
+  });
+
+  it('falls back to the GPS time, the iPhone zone, then the file date, flagging guesses', async () => {
+    const db = createTestDb();
+    const sheet = await pick(db, [
+      photoFile('IMG_0001.JPG', {
+        dateTimeOriginal: '2026:10:14 10:35:12',
+        gps: { ...gps, dateStamp: '2026:10:14', timeStamp: [3, 35, 12] },
+      }),
+      photoFile('IMG_0002.JPG', { dateTimeOriginal: '2026:10:14 10:40:00', gps }),
+      photoFile('IMG_0003.JPG', { gps }, Date.parse('2026-10-13T21:45:00Z')),
+    ]);
+
+    await within(sheet).findByRole('checkbox', { name: /IMG_0001.*10:35:12 am \(UTC\+07:00\)/ });
+    expect(
+      within(sheet).queryByRole('checkbox', { name: /IMG_0001.*(assumed|file date)/ }),
+    ).toBeNull();
+    within(sheet).getByRole('checkbox', { name: /IMG_0002.*10:40:00 am.*Time zone assumed/ });
+    within(sheet).getByRole('checkbox', { name: /IMG_0003.*10:45:00 am.*Time from the file date/ });
+    expect(rowNames(sheet)).toEqual(['IMG_0002.JPG', 'IMG_0003.JPG', 'IMG_0001.JPG']);
+
+    fireEvent.click(within(sheet).getByRole('button', { name: 'Add 3 entries' }));
+
+    await screen.findByText('Added 3 entries.');
+    expect(await listEntries(db)).toEqual([
+      expect.objectContaining({
+        loggedAt: Date.parse('2026-10-14T03:35:12Z'),
+        timeZone: offsetOnlyZone,
+        utcOffsetMin: 420,
+      }),
+      expect.objectContaining({
+        loggedAt: Date.parse('2026-10-13T21:45:00Z'),
+        timeZone: 'Pacific/Auckland',
+        utcOffsetMin: 780,
+      }),
+      expect.objectContaining({
+        loggedAt: Date.parse('2026-10-13T21:40:00Z'),
+        timeZone: 'Pacific/Auckland',
+        utcOffsetMin: 780,
+      }),
+    ]);
+  });
+
+  it('takes a typed time for a photo with none, and keeps the rows in time order', async () => {
+    const db = createTestDb();
+    const sheet = await pick(db, [
+      photoFile('IMG_0001.JPG', harbour),
+      photoFile('IMG_0002.JPG', { gps }, noFileDate),
+    ]);
+
+    const untimed = await within(sheet).findByRole('checkbox', { name: /IMG_0002.*No time/ });
+    expect(untimed).toHaveProperty('checked', true);
+    const confirm = within(sheet).getByRole('button', { name: 'Add 2 entries' });
+    expect(confirm).toHaveProperty('disabled', true);
+
+    fireEvent.change(within(sheet).getByLabelText('Date and time for IMG_0002.JPG'), {
+      target: { value: '2026-10-14T09:15' },
+    });
+
+    expect(rowNames(sheet)).toEqual(['IMG_0002.JPG', 'IMG_0001.JPG']);
+    within(sheet).getByRole('checkbox', { name: /IMG_0002.*9:15:00 am/ });
+    expect(within(sheet).queryByRole('checkbox', { name: /No time/ })).toBeNull();
+    expect(confirm).toHaveProperty('disabled', false);
+    fireEvent.click(confirm);
+
+    await screen.findByText('Added 2 entries.');
+    expect((await listEntries(db)).map((entry) => entry.loggedAt)).toEqual([
+      Date.parse('2026-10-13T21:35:12Z'),
+      Date.parse('2026-10-13T20:15:00Z'),
+    ]);
   });
 
   it('adds to no trip when that is chosen', async () => {

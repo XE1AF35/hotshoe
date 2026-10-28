@@ -1,7 +1,12 @@
 import type { NewEntry } from '../../db/entries.ts';
 import type { TripId } from '../../db/schema.ts';
 import { isValidLatLon, type LatLon } from '../../lib/coords.ts';
-import { contextForOffset, type TimeContext } from '../../lib/time.ts';
+import {
+  contextForOffset,
+  instantInZone,
+  type TimeContext,
+  zoneOffsetMin,
+} from '../../lib/time.ts';
 import { type ExifTags, readExif } from './exif.ts';
 
 /** What a photo's metadata says about the Entry it could become, before anything is saved. */
@@ -23,13 +28,18 @@ export interface DraftLocation extends LatLon {
 
 export type DraftTime =
   | {
-      /** The shot time with its UTC offset. */
-      readonly source: 'exact';
+      /**
+       * How the time was found, most sure first: the shot time with its UTC offset, the GPS
+       * clock, the shot time read in the iPhone's zone, the file date, or typed by hand.
+       */
+      readonly source: TimeSource;
       /** Epoch ms UTC. */
       readonly at: number;
       readonly context: TimeContext;
     }
   | { readonly source: 'missing' };
+
+export type TimeSource = 'exact' | 'gps' | 'zone-assumed' | 'file-date' | 'typed';
 
 /** EXIF sits at the start of a JPEG, so a 48 MP photo never needs reading whole. */
 const headBytes = 256 * 1024;
@@ -40,7 +50,7 @@ const headBytes = 256 * 1024;
  */
 export async function readPhotoDraft(file: File, deviceZone: string): Promise<PhotoDraft> {
   const tags = readExif(await readHead(file));
-  return { file, time: readTime(tags, deviceZone), location: readLocation(tags) };
+  return { file, time: readTime(tags, file, deviceZone), location: readLocation(tags) };
 }
 
 /** Whether a draft has the time and location an Entry needs. */
@@ -69,6 +79,24 @@ export function newEntryFromDraft(draft: PhotoDraft, tripId: TripId | null): New
   };
 }
 
+/**
+ * A time typed into a date and time field, such as `2026-10-14T10:35`, read in the iPhone's
+ * zone. Missing while blank or incomplete.
+ */
+export function typedTime(text: string, deviceZone: string): DraftTime {
+  const match = text.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
+  if (!match) return { source: 'missing' };
+  const [year, month, day, hour, minute, second] = match
+    .slice(1)
+    .map((part) => Number(part ?? 0)) as [number, number, number, number, number, number];
+  const wall = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  // Date.UTC rolls a 31 February over into March.
+  if (wall.getUTCMonth() !== month - 1 || wall.getUTCDate() !== day) return { source: 'missing' };
+  const at = instantInZone(wall.getTime(), deviceZone);
+  if (at === null) return { source: 'missing' };
+  return { source: 'typed', at, context: zoneContext(at, deviceZone) };
+}
+
 /** The start of the file, or nothing when it can't be read, such as a photo since deleted. */
 async function readHead(file: File): Promise<ArrayBuffer> {
   try {
@@ -78,13 +106,54 @@ async function readHead(file: File): Promise<ArrayBuffer> {
   }
 }
 
-function readTime(tags: ExifTags, deviceZone: string): DraftTime {
-  const local = parseExifDateTime(tags.dateTimeOriginal);
+function readTime(tags: ExifTags, file: File, deviceZone: string): DraftTime {
+  const shot = parseExifDateTime(tags.dateTimeOriginal);
+  const local = shot === null ? null : shot + subSecondMs(tags.subSecTimeOriginal);
   const offsetMin = parseOffset(tags.offsetTimeOriginal);
-  if (local === null || offsetMin === null) return { source: 'missing' };
+  if (local !== null && offsetMin !== null) {
+    const at = local - offsetMin * 60_000;
+    return { source: 'exact', at, context: contextForOffset(at, offsetMin, deviceZone) };
+  }
 
-  const at = local + subSecondMs(tags.subSecTimeOriginal) - offsetMin * 60_000;
-  return { source: 'exact', at, context: contextForOffset(at, offsetMin, deviceZone) };
+  const gpsAt = gpsTime(tags.gpsDateStamp, tags.gpsTimeStamp);
+  if (gpsAt !== null) {
+    const shownOffset = local === null ? null : offsetBetween(local, gpsAt);
+    return {
+      source: 'gps',
+      at: gpsAt,
+      context:
+        shownOffset === null
+          ? zoneContext(gpsAt, deviceZone)
+          : contextForOffset(gpsAt, shownOffset, deviceZone),
+    };
+  }
+
+  const assumedAt = local === null ? null : instantInZone(local, deviceZone);
+  if (assumedAt !== null) {
+    return { source: 'zone-assumed', at: assumedAt, context: zoneContext(assumedAt, deviceZone) };
+  }
+
+  // Zero, or nonsense, when the file has no date.
+  const fileAt = file.lastModified;
+  if (Number.isFinite(fileAt) && fileAt > 0) {
+    return { source: 'file-date', at: fileAt, context: zoneContext(fileAt, deviceZone) };
+  }
+
+  return { source: 'missing' };
+}
+
+/** A zone's own context at an instant. */
+function zoneContext(epochMs: number, timeZone: string): TimeContext {
+  return { timeZone, utcOffsetMin: zoneOffsetMin(epochMs, timeZone) ?? 0 };
+}
+
+/**
+ * The UTC offset a local clock showed at a UTC instant, to the nearest quarter hour since the
+ * two clocks can be seconds apart. Null when it is no real offset.
+ */
+function offsetBetween(localMs: number, utcMs: number): number | null {
+  const offsetMin = Math.round((localMs - utcMs) / (15 * 60_000)) * 15;
+  return offsetMin >= -12 * 60 && offsetMin <= 14 * 60 ? offsetMin : null;
 }
 
 function readLocation(tags: ExifTags): DraftLocation | null {
